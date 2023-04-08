@@ -63,21 +63,6 @@ public:
     }
 };
 
-class DecisionBox {//判定框长宽
-public:
-    DecisionBox(double InRX = 0, double InUY = 0, double InLX = 0, double InLY = 0) :RightUpper(InRX, InUY), LeftLower(InLX, InLY){}
-    ScreenPoint RightUpper;
-    ScreenPoint LeftLower;
-public:
-    friend ostream& operator<<(ostream& output, const DecisionBox& Box) {
-        output << " 判断框右X屏幕坐标 " << Box.RightUpper.X << " 判断框左X屏幕坐标 " << Box.LeftLower.X << " 判断框上Y屏幕坐标 " << Box.RightUpper.Y << " 判断框下X屏幕坐标 " << Box.LeftLower.Y ;
-        return output;
-    }
-    double HitRate(extern 概率密度函数类型 函数指针,double 方差参数) {
-        return (函数指针(RightUpper.X, RightUpper.Y, 方差参数) - 函数指针(RightUpper.X, LeftLower.Y, 方差参数) - 函数指针(LeftLower.X, RightUpper.Y, 方差参数) + 函数指针(LeftLower.X, LeftLower.Y, 方差参数));
-    }
-};
-
 //记录了后坐力发生剧烈转折时子弹位置与时间或者子弹在不压枪情况下子弹位置和距离第一次开火时间 
 //这里直接输入所有子弹的位置与时间也可以,直接将后坐力拆成超多拐点的折现  子弹XY坐标也可以做成后坐力偏差类型  建议数组 拐点[0]={0,0,0}
 class InflectionPoint {//屏幕拐点
@@ -89,6 +74,210 @@ public:
     ScreenPoint Accelerated;//加速度
     double Time;
 public:
+    friend ostream& operator<<(ostream& output, const InflectionPoint& Point) {//重载cout输出
+        output << " X屏幕坐标 " << Point.Shift.X << " Y屏幕坐标 " << Point.Shift.Y << " 时间 " << Point.Time;
+        output << " X屏幕速度 " << Point.Velocity.X << " Y屏幕速度 " << Point.Velocity.Y;
+        output << " X屏幕加速度 " << Point.Accelerated.X << " Y屏幕加速度 " << Point.Accelerated.Y << endl;
+        return output;
+    }
+};
+
+class GameLocation {//目标位置距离原点单位
+public:
+    GameLocation(double InX = 0, double InY = 0, double InZ = 10) :X(InX), Y(InY), Z(InZ) {}
+    double X;//目标位置距离原点x个单位
+    double Y;//目标位置距离原点y个单位
+    double Z;//目标位置距离原点z个单位
+public:
+    GameLocation operator+(const GameLocation& other) {
+        return GameLocation(X + other.X, Y + other.Y, Z + other.Z);
+    }
+    GameLocation operator-(const GameLocation& other) {
+        return GameLocation(X - other.X, Y - other.Y, Z - other.Z);
+    }
+    GameLocation operator*(double other) {
+        return GameLocation(X * other, Y * other, Z * other);
+    }
+    GameLocation operator/(double other) {
+        return GameLocation(X / other, Y / other, Z / other);
+    }
+    ScreenPoint LocationToPoint() {//位置转变成偏差函数
+        if (Z == 0) {
+            cout << "Z轴为0 错误";
+            return ScreenPoint(0, 0);
+        }
+        return ScreenPoint(X * ScalingFactor / Z, Y * ScalingFactor / Z);
+    }
+    friend ostream& operator<<(ostream& output, const GameLocation& Point) {
+        output << " 点X游戏位置 " << Point.X << " 点Y游戏位置 " << Point.Y << " 点Z游戏位置 " << Point.Z;
+        return output;
+    }
+    bool operator==(const GameLocation& other) {
+        if (X == other.X && Y == other.Y && Z == other.Z)return true;
+        else return false;
+    }
+};//目标位置距离原点单位
+
+class InflectionLocation {//记录了游戏内的 实际 坐标的拐点
+public:
+    InflectionLocation(double S_X = 0.0, double S_Y = 0.0, double S_Z = 10.0, double T = 0.0, double V_X = 0.0, double V_Y = 0.0, double V_Z = 0.0, double A_X = 0.0, double A_Y = 0.0, double A_Z = 0.0)
+        : Shift(S_X, S_Y, S_Z), Velocity(V_X, V_Y, V_Z), Accelerated(A_X, A_Y, A_Z), Time(T) {}
+    GameLocation Shift;//位移
+    GameLocation Velocity;//速度
+    GameLocation Accelerated;//加速度
+    double Time;
+public:
+    friend ostream& operator<<(ostream& output, const InflectionLocation& Location) {//重载cout输出
+        output << " X屏幕坐标 " << Location.Shift.X << " Y屏幕坐标 " << Location.Shift.Y << " Z屏幕坐标 " << Location.Shift.Z << " 时间 " << Location.Time;
+        output << " X屏幕速度 " << Location.Velocity.X << " Y屏幕速度 " << Location.Velocity.Y << " Z屏幕速度 " << Location.Velocity.Z;
+        output << " X屏幕加速度 " << Location.Accelerated.X << " Y屏幕加速度 " << Location.Accelerated.Y << " Z屏幕加速度 " << Location.Accelerated.Z << endl;
+        return output;
+    }
+}; 
+
+class SequenceLocation {//游戏内位置拐点序列
+public:
+    SequenceLocation(InflectionLocation* Point, int j) {//
+        for (int i = 0; i < j; i++)
+            Sequence.push_back(Point[i]);
+    }
+    SequenceLocation(InflectionLocation Point) {
+        Sequence.push_back(Point);
+    }
+    SequenceLocation()
+    : Sequence(1, InflectionLocation()) {}
+    SequenceLocation(int i)
+    : Sequence(i, InflectionLocation()) {}
+    vector<InflectionLocation> Sequence;
+public:
+    void 实际拐点位置_转速度函数() {//实际拐点位置_转速度函数  对于只有位置的拐点序列进行一阶近似  添加其速度
+        for (int i = 0; i < Sequence.size(); i++) {//求数组长度
+            if (Sequence[i + 1].Time == 0) {//从数组1开始搜索  因为末尾后没定义的数组默认为0  所以如果循环到末尾 结束 
+                break;
+            }
+            Sequence[i].Velocity = (Sequence[i + 1].Shift - Sequence[i].Shift) / (Sequence[i + 1].Time - Sequence[i].Time);
+            Sequence[i].Accelerated = GameLocation(0, 0, 0);
+        }
+    }
+    void 实际拐点速度_转位置函数() {//实际拐点速度_转位置函数  对于没有位置拐点序列进行简单积分  添加其偏差
+        for (int i = 0; i < Sequence.size(); i++) {//求数组长度
+            if (Sequence[i + 1].Time == 0) {//从数组1开始搜索  因为末尾后没定义的数组默认为0  所以如果循环到末尾 结束 
+                break;
+            }
+            double 时间差 = Sequence[i + 1].Time - Sequence[i].Time;//避免重复计算 下同
+            Sequence[i + 1].Shift = Sequence[i].Shift + Sequence[i].Velocity * (时间差)+Sequence[i].Accelerated * (时间差) * (时间差) / 2;
+        }
+    }
+    ScreenPoint 实际拐点型_转屏幕偏差函数(double 时间变量) {//屏幕拐点型_转屏幕偏差函数   输入时间和拐点序列  输出在T时刻的屏幕偏差
+        int i;
+        for (i = 0; Sequence[i + 1].Time <= 时间变量; i++)//寻找一个Time[i]<时间<Time[i+1]的位置 下同
+            if (i + 2 >= Sequence.size()) {//找遍所以未找到对应  强制结束
+                cout << 时间变量 << "时间变量过长 (实际拐点型_转屏幕偏差函数)" << endl;
+                return (0, 0);//以后写成抛出异常
+            }
+        double 时间差 = 时间变量 - Sequence[i].Time;
+        return ((Sequence[i].Shift + Sequence[i].Velocity * (时间差)+Sequence[i].Accelerated * (时间差) * (时间差) / 2).LocationToPoint()); //转计算游戏内位置换成屏幕偏差点
+    }
+    GameLocation 实际拐点型_转实际位置函数(double 时间变量) {
+        int i;
+        for (i = 0; Sequence[i + 1].Time <= 时间变量; i++)//寻找一个Time[i]<时间<Time[i+1]的位置 下同
+            if (i + 2 >= Sequence.size()) {
+                cout << 时间变量 << "时间变量过长 (实际拐点型_转实际位置函数)" << endl;
+                return GameLocation(0, 0, 0);
+            }
+        double 时间差 = 时间变量 - Sequence[i].Time;
+        return (Sequence[i].Shift + Sequence[i].Velocity * (时间差)+Sequence[i].Accelerated * (时间差) * (时间差) / 2);
+    }
+    ScreenPoint 实际拐点型_转屏幕速度偏差函数(double 时间变量) {
+        double ZZ;//临时目标位置Z
+        ScreenPoint TemporaryPointVelocity = (0, 0);
+        int i;
+        for (i = 0; Sequence[i + 1].Time <= 时间变量; i++)//寻找一个转折时间[i]<时间<转折时间[i+1]的位置 下同
+            if (i + 2 >= Sequence.size()) {
+                cout << 时间变量 << "时间变量过长 (实际拐点型_转实际位置函数)" << endl;
+                return TemporaryPointVelocity;
+            }
+        //设X实际位移函数  (X位置+X速度*时间+X加速度*时间^2/2)
+        //设Z实际位移函数  (Z位置+Z速度*时间+Z加速度*时间^2/2)
+        //屏幕位置X函数为  (X实际位移)/(Z实际位移)*放缩系数
+        //所以屏幕速度X函数为 上面函数对时间求导  (X实际位移导函数*Z实际位移-X实际位移*Z实际位移导函数)/(Z实际位移)^2*放缩系数
+        //((X速度*Z位置-X位置*Z速度+(X加速度*Z位置-X位置*Z加速度)*时间+((X加速度*Z速度-X速度*Z加速度)/2)*时间^2 )*放缩系数)/Z实际位移^2 
+        //详细解释见文档附录
+        double 时间差 = 时间变量 - Sequence[i].Time;
+        ZZ = Sequence[i].Shift.Z + Sequence[i].Velocity.Z * (时间差)+Sequence[i].Accelerated.Z * (时间差) * (时间差) / 2;
+        TemporaryPointVelocity.X = ((Sequence[i].Velocity.X * Sequence[i].Shift.Z - Sequence[i].Velocity.Z * Sequence[i].Shift.X + (Sequence[i].Accelerated.X * Sequence[i].Shift.Z - Sequence[i].Shift.X * Sequence[i].Accelerated.Z) * 时间差 + ((Sequence[i].Accelerated.X * Sequence[i].Velocity.Z - Sequence[i].Velocity.X * Sequence[i].Accelerated.Z) / 2) * 时间差 * 时间差) * ScalingFactor) / (ZZ * ZZ);
+        TemporaryPointVelocity.Y = ((Sequence[i].Velocity.Y * Sequence[i].Shift.Z - Sequence[i].Velocity.Z * Sequence[i].Shift.Y + (Sequence[i].Accelerated.Y * Sequence[i].Shift.Z - Sequence[i].Shift.Y * Sequence[i].Accelerated.Z) * 时间差 + ((Sequence[i].Accelerated.Y * Sequence[i].Velocity.Z - Sequence[i].Velocity.Y * Sequence[i].Accelerated.Z) / 2) * 时间差 * 时间差) * ScalingFactor) / (ZZ * ZZ);
+        return TemporaryPointVelocity;
+    }
+    friend ostream& operator<<(ostream& output, const SequenceLocation& Inflection) {
+        for (int i = 0; i < Inflection.Sequence.size(); i++) {//求数组长度
+            output << " 第" << i << "点 " << " X位置坐标 " << Inflection.Sequence[i];
+        }
+        return output;
+    }
+};
+
+class DecisionBox {//判定框长宽
+public:
+    DecisionBox(double InRX = 0, double InUY = 0, double InLX = 0, double InLY = 0) :RightUpper(InRX, InUY), LeftLower(InLX, InLY) {}
+    ScreenPoint RightUpper;
+    ScreenPoint LeftLower;
+public:
+    friend ostream& operator<<(ostream& output, const DecisionBox& Box) {
+        output << " 判断框右X屏幕坐标 " << Box.RightUpper.X << " 判断框左X屏幕坐标 " << Box.LeftLower.X << " 判断框上Y屏幕坐标 " << Box.RightUpper.Y << " 判断框下Y屏幕坐标 " << Box.LeftLower.Y;
+        return output;
+    }
+    double HitRate(概率密度函数类型 函数指针, double 方差参数) {
+        return (函数指针(RightUpper.X, RightUpper.Y, 方差参数) - 函数指针(RightUpper.X, LeftLower.Y, 方差参数) - 函数指针(LeftLower.X, RightUpper.Y, 方差参数) + 函数指针(LeftLower.X, LeftLower.Y, 方差参数));
+    }
+};
+
+class SizeOfBox {//目标简单判定框大小    复杂模型可以由多个框组成  这里暂时使用单个方框
+public:
+    SizeOfBox(double InX=10, double InY=10, double InT=0):X(InX), Y(InY), Time(InT){}
+    double X;
+    double Y;
+    double Time;
+public:
+    friend ostream& operator<<(ostream& output, const SizeOfBox& Box) {//重载cout输出
+        output << " 框X游戏位置大小 " << Box.X << " 框Y游戏位置大小 " << Box.Y<< " 框时间T "<< Box.Time<<endl;
+        return output;
+    }
+};
+
+class SequenceBox {//目标简单判定框大小序列
+public:
+    SequenceBox(SizeOfBox* Box, int j) {//
+        for (int i = 0; i < j; i++)
+            Sequence.push_back(Box[i]);
+    }
+    SequenceBox(SizeOfBox Box) {
+        Sequence.push_back(Box);
+    }
+    SequenceBox()
+        : Sequence(1, SizeOfBox()) {}
+    SequenceBox(int i)
+        : Sequence(i, SizeOfBox()) {}
+    vector<SizeOfBox> Sequence;
+public:
+    friend ostream& operator<<(ostream& output, const SequenceBox& Box) {//重载cout输出
+        for (int i = 0; i < Box.Sequence.size(); i++) {//求数组长度
+            output << " 第" << i << "点 " << " X位置坐标 " << Box.Sequence[i];
+        }
+        return output;
+    }
+};
+
+struct 玩家技术 {//定义在最开始 后面有函数用到这个结构体
+    double 简单压枪倍率;
+    double 简单目标跟踪倍率;
+    double 压枪方向熟练程度;
+    double 压枪速度熟练程度;
+    double 压枪时间熟练程度;
+    double 跟枪速度熟练程度;
+    double 跟枪方向熟练程度;
+    double 反应力;
+    double 跟枪等级;
 };
 
 class SequencePoint {//屏幕拐点序列
@@ -97,13 +286,13 @@ public:
         for (int i = 0; i < j; i++)
             Sequence.push_back(Point[i]);
     }
-    SequencePoint(InflectionPoint Point){
+    SequencePoint(InflectionPoint Point) {
         Sequence.push_back(Point);
     }
     SequencePoint()
-    : Sequence(1, InflectionPoint()) {}
+        : Sequence(1, InflectionPoint()) {}
     SequencePoint(int i)
-    : Sequence(i, InflectionPoint()){}
+        : Sequence(i, InflectionPoint()) {}
     vector<InflectionPoint> Sequence;
 public:
     void 屏幕拐点位置_转速度函数() {//屏幕拐点位置_转速度函数  对于只有位置的拐点序列进行一阶近似  添加其速度
@@ -126,17 +315,19 @@ public:
     }
     ScreenPoint 屏幕拐点型_转屏幕偏差函数(double 时间变量) {//屏幕拐点型_转屏幕偏差函数   输入时间和拐点序列  输出在T时刻的屏幕偏差
         int i;
-        for(i=0; Sequence[i + 1].Time <= 时间变量; i++)//寻找一个开火时间[i]<时间<开火时间[i+1]的位置 下同
-            if (i + 2 >= Sequence.size()) {//找遍所以未找到对应  强制结束
-                return ScreenPoint(0, 0);//以后写成抛出异常
-            }
+        for (i = 0; Sequence[i + 1].Time <= 时间变量; i++)//寻找一个Time[i]<时间<Time[i+1]的位置 下同  
+            if (i + 2 >= Sequence.size()) {//找遍所以未找到对应  强制结束    i+2的解释 首先原句为while([i + 1].Time <= 时间变量)                                              i++
+                cout << 时间变量 << "时间变量过长 (屏幕拐点型_转屏幕偏差函数)" << endl;//                           i++                                              
+                return ScreenPoint(0, 0);//以后写成抛出异常                                           if (i + 1 >= Sequence.size())           
+            }//但是 for的i++是最后执行的  所以 i++ 和 i + 1 >= Sequence.size() 和为  i + 2 >= Sequence.size()
         double 时间差 = 时间变量 - Sequence[i].Time;
         return (Sequence[i].Shift + Sequence[i].Velocity * (时间差)+Sequence[i].Accelerated * (时间差) * (时间差) / 2);
     }
     ScreenPoint 屏幕拐点型_转屏幕速度偏差函数(double 时间变量) {//输入时间和拐点序列  输出在T时刻的屏幕偏差的速度
         int i;
-        for (i = 0; Sequence[i + 1].Time <= 时间变量; i++)//寻找一个开火时间[i]<时间<开火时间[i+1]的位置 下同
-            if (i + 2 >= Sequence.size()) {//找遍所以未找到对应  强制结束
+        for (i = 0; Sequence[i + 1].Time <= 时间变量; i++)//寻找一个Time[i]<时间<Time[i+1]的位置 下同
+            if (i + 2 >= Sequence.size()) {//找遍所以未找到对应  强制结束 
+                cout << 时间变量 << "时间变量过长 (屏幕拐点型_转屏幕速度偏差函数)" << endl;
                 return (0, 0);//以后写成抛出异常
             }
         return (Sequence[i].Velocity + Sequence[i].Accelerated * (时间变量 - Sequence[i].Time));
@@ -144,9 +335,7 @@ public:
     friend ostream& operator<<(ostream& output, const SequencePoint& Inflection) {
         int i;
         for (i = 0; i < Inflection.Sequence.size(); i++) {//求数组长度
-            output <<" 第"<<i<<"点 "<< " X屏幕坐标 " << Inflection.Sequence[i].Shift.X << " Y屏幕坐标 " << Inflection.Sequence[i].Shift.Y <<" 时间 " << Inflection.Sequence[i].Time;
-            output << " X屏幕速度 " << Inflection.Sequence[i].Velocity.X << " Y屏幕速度 " << Inflection.Sequence[i].Velocity.Y ;
-            output << " X屏幕加速度 " << Inflection.Sequence[i].Accelerated.X << " Y屏幕加速度 " << Inflection.Sequence[i].Accelerated.Y <<endl;
+            output << " 第" << i << "点 " << " X屏幕坐标 " << Inflection.Sequence[i];
         }
         return output;
     }
@@ -189,12 +378,6 @@ public:
         double 一阶跟枪类型能力;
         double 二阶跟枪类型能力;
         int i;
-        ScreenPoint 后坐力屏幕偏差;
-        ScreenPoint 压枪屏幕偏差;
-        ScreenPoint 目标运动屏幕偏差;
-        ScreenPoint 后坐力屏幕速度偏差;
-        ScreenPoint 压枪屏幕速度偏差;
-        ScreenPoint 目标运动屏幕速度偏差;
         Sequence[1].Time = 玩家技术实体.反应力;
         if (玩家技术实体.跟枪等级 < 1) {
             一阶跟枪类型能力 = 玩家技术实体.跟枪等级;
@@ -208,18 +391,12 @@ public:
             速度误差 = 正态分布随机数((double)(1 / 玩家技术实体.跟枪速度熟练程度), 0);
             方向误差 = 正态分布随机数((double)(1 / 玩家技术实体.跟枪方向熟练程度), 0);
 
-            后坐力屏幕偏差 = 后坐力序列.屏幕拐点型_转屏幕偏差函数(i * 玩家技术实体.反应力);
-            压枪屏幕偏差 = 压枪序列.屏幕拐点型_转屏幕偏差函数(i * 玩家技术实体.反应力);
-            目标运动屏幕偏差 = 目标移动.实际拐点型_转屏幕偏差函数(i * 玩家技术实体.反应力);
-            if (后坐力屏幕偏差 == ScreenPoint(0, 0) && 压枪屏幕偏差 == ScreenPoint(0, 0) && 目标运动屏幕偏差 == ScreenPoint(0, 0)) {
+            if (后坐力序列.屏幕拐点型_转屏幕偏差函数(i * 玩家技术实体.反应力) == ScreenPoint(0, 0) && 压枪序列.屏幕拐点型_转屏幕偏差函数(i * 玩家技术实体.反应力) == ScreenPoint(0, 0) && 目标移动.实际拐点型_转屏幕偏差函数(i * 玩家技术实体.反应力) == ScreenPoint(0, 0)) {
                 break;
             }
-            临时偏差 = 压枪屏幕偏差 - 后坐力屏幕偏差 + 目标运动屏幕偏差 - Sequence[i].Shift;
+            临时偏差 = 压枪序列.屏幕拐点型_转屏幕偏差函数(i * 玩家技术实体.反应力) -后坐力序列.屏幕拐点型_转屏幕偏差函数(i * 玩家技术实体.反应力) + 目标移动.实际拐点型_转屏幕偏差函数(i * 玩家技术实体.反应力) - Sequence[i].Shift;
 
-            后坐力屏幕速度偏差 = 后坐力序列.屏幕拐点型_转屏幕速度偏差函数(i * 玩家技术实体.反应力);
-            压枪屏幕速度偏差 = 压枪序列.屏幕拐点型_转屏幕速度偏差函数(i * 玩家技术实体.反应力);
-            目标运动屏幕速度偏差 = 目标移动.实际拐点型_转屏幕速度偏差函数(i * 玩家技术实体.反应力);
-            临时速度偏差 = 压枪屏幕速度偏差 - 后坐力屏幕速度偏差 + 目标运动屏幕速度偏差;
+            临时速度偏差 = 压枪序列.屏幕拐点型_转屏幕速度偏差函数(i * 玩家技术实体.反应力) - 后坐力序列.屏幕拐点型_转屏幕速度偏差函数(i * 玩家技术实体.反应力) + 目标移动.实际拐点型_转屏幕速度偏差函数(i * 玩家技术实体.反应力);
 
             Sequence[i].Velocity = (临时偏差 / 玩家技术实体.反应力 + 临时速度偏差 * 一阶跟枪类型能力).向量旋转(PI * 方向误差) * (1 + 速度误差);
             Sequence[i].Accelerated = (0, 0);
@@ -229,148 +406,8 @@ public:
     };
 };
 
-class GameLocation {//目标位置距离原点单位
-public:
-    GameLocation(double InX = 0, double InY = 0, double InZ = 10) :X(InX), Y(InY), Z(InZ) {}
-    double X;//目标位置距离原点x个单位
-    double Y;//目标位置距离原点y个单位
-    double Z;//目标位置距离原点z个单位
-public:
-    GameLocation operator+(const GameLocation& other) {
-        return GameLocation(X + other.X, Y + other.Y, Z + other.Z);
-    }
-    GameLocation operator-(const GameLocation& other) {
-        return GameLocation(X - other.X, Y - other.Y, Z - other.Z);
-    }
-    GameLocation operator*(double other) {
-        return GameLocation(X * other, Y * other, Z * other);
-    }
-    GameLocation operator/(double other) {
-        return GameLocation(X / other, Y / other, Z / other);
-    }
-    ScreenPoint LocationToPoint() {//位置转变成偏差函数
-        if (Z == 0) {
-            cout << "Z轴为0 错误";
-            return ScreenPoint(0, 0);
-        }
-        return ScreenPoint(X * ScalingFactor / Z, Y * ScalingFactor / Z);
-    }
-    friend ostream& operator<<(ostream& output, const GameLocation& Point) {
-        output << " 点X游戏位置 " << Point.X << " 点Y游戏位置 " << Point.Y << " 点Z游戏位置 " << Point.Z;
-        return output;
-    }
-    bool operator==(const GameLocation& other) {
-        if (X == other.X && Y == other.Y && Z == other.Z)return true;
-        else return false;
-    }
-};
-
-class InflectionLocation {//记录了游戏内的  实际  坐标的拐点
-public:
-    InflectionLocation(double S_X = 0.0, double S_Y = 0.0, double S_Z = 10.0, double T = 0.0, double V_X = 0.0, double V_Y = 0.0, double V_Z = 0.0, double A_X = 0.0, double A_Y = 0.0, double A_Z = 0.0)
-        : Shift(S_X, S_Y, S_Z), Velocity(V_X, V_Y, V_Z), Accelerated(A_X, A_Y, A_Z), Time(T) {}
-    GameLocation Shift;//位移
-    GameLocation Velocity;//速度
-    GameLocation Accelerated;//加速度
-    double Time;
-public:
-};
-
-class SequenceLocation {//游戏内位置拐点序列
-public:
-    SequenceLocation(InflectionLocation* Point, int j) {//
-        for (int i = 0; i < j; i++)
-            Sequence.push_back(Point[i]);
-    }
-    SequenceLocation(InflectionLocation Point) {
-        Sequence.push_back(Point);
-    }
-    SequenceLocation()
-    : Sequence(1, InflectionLocation()) {}
-    SequenceLocation(int i)
-    : Sequence(i, InflectionLocation()) {}
-    vector<InflectionLocation> Sequence;
-public:
-    void 实际拐点位置_转速度函数() {//实际拐点位置_转速度函数  对于只有位置的拐点序列进行一阶近似  添加其速度
-        for (int i = 0; i < Sequence.size(); i++) {//求数组长度
-            if (Sequence[i + 1].Time == 0) {//从数组1开始搜索  因为末尾后没定义的数组默认为0  所以如果循环到末尾 结束 
-                break;
-            }
-            Sequence[i].Velocity = (Sequence[i + 1].Shift - Sequence[i].Shift) / (Sequence[i + 1].Time - Sequence[i].Time);
-            Sequence[i].Accelerated = GameLocation(0, 0, 0);
-        }
-    }
-    void 实际拐点速度_转位置函数() {//实际拐点速度_转位置函数  对于没有位置拐点序列进行简单积分  添加其偏差
-        for (int i = 0; i < Sequence.size(); i++) {//求数组长度
-            if (Sequence[i + 1].Time == 0) {//从数组1开始搜索  因为末尾后没定义的数组默认为0  所以如果循环到末尾 结束 
-                break;
-            }
-            double 时间差 = Sequence[i + 1].Time - Sequence[i].Time;//避免重复计算 下同
-            Sequence[i + 1].Shift = Sequence[i].Shift + Sequence[i].Velocity * (时间差)+Sequence[i].Accelerated * (时间差) * (时间差) / 2;
-        }
-    }
-    ScreenPoint 实际拐点型_转屏幕偏差函数(double 时间变量) {//屏幕拐点型_转屏幕偏差函数   输入时间和拐点序列  输出在T时刻的屏幕偏差
-        int i;
-        for (i = 0; Sequence[i + 1].Time <= 时间变量; i++)//寻找一个转折时间[i]<时间<转折时间[i+1]的位置 下同
-            if (i + 2 >= Sequence.size()) {//找遍所以未找到对应  强制结束
-                return (0, 0);//以后写成抛出异常
-            }
-        double 时间差 = 时间变量 - Sequence[i].Time;
-        return ((Sequence[i].Shift + Sequence[i].Velocity * (时间差)+Sequence[i].Accelerated * (时间差) * (时间差) / 2).LocationToPoint()); //转计算游戏内位置换成屏幕偏差点
-    }
-    GameLocation 实际拐点型_转实际位置函数(double 时间变量) {
-        int i;
-        for (i = 0; Sequence[i + 1].Time <= 时间变量; i++)//寻找一个转折时间[i]<时间<转折时间[i+1]的位置 下同
-            if (i + 2 >= Sequence.size()) {
-                return GameLocation(0, 0, 0);
-            }
-        double 时间差 = 时间变量 - Sequence[i].Time;
-        return (Sequence[i].Shift + Sequence[i].Velocity * (时间差)+Sequence[i].Accelerated * (时间差) * (时间差) / 2);
-    }
-    ScreenPoint 实际拐点型_转屏幕速度偏差函数(double 时间变量) {
-        double ZZ;//临时目标位置Z
-        ScreenPoint TemporaryPointVelocity = (0, 0);
-        int i;
-        for (i = 0; Sequence[i + 1].Time <= 时间变量; i++)//寻找一个转折时间[i]<时间<转折时间[i+1]的位置 下同
-            if (i + 2 >= Sequence.size()) {
-                return TemporaryPointVelocity;
-            }
-        //设X实际位移函数  (X位置+X速度*时间+X加速度*时间^2/2)
-        //设Z实际位移函数  (Z位置+Z速度*时间+Z加速度*时间^2/2)
-        //屏幕位置X函数为  (X实际位移)/(Z实际位移)*放缩系数
-        //所以屏幕速度X函数为 上面函数对时间求导  (X实际位移导函数*Z实际位移-X实际位移*Z实际位移导函数)/(Z实际位移)^2*放缩系数
-        //((X速度*Z位置-X位置*Z速度+(X加速度*Z位置-X位置*Z加速度)*时间+((X加速度*Z速度-X速度*Z加速度)/2)*时间^2 )*放缩系数)/Z实际位移^2 
-        //详细解释见文档附录
-        double 时间差 = 时间变量 - Sequence[i].Time;
-        ZZ = Sequence[i].Shift.Z + Sequence[i].Velocity.Z * (时间差)+Sequence[i].Accelerated.Z * (时间差) * (时间差) / 2;
-        TemporaryPointVelocity.X = ((Sequence[i].Velocity.X * Sequence[i].Shift.Z - Sequence[i].Velocity.Z * Sequence[i].Shift.X + (Sequence[i].Accelerated.X * Sequence[i].Shift.Z - Sequence[i].Shift.X * Sequence[i].Accelerated.Z) * 时间差 + ((Sequence[i].Accelerated.X * Sequence[i].Velocity.Z - Sequence[i].Velocity.X * Sequence[i].Accelerated.Z) / 2) * 时间差 * 时间差) * ScalingFactor) / (ZZ * ZZ);
-        TemporaryPointVelocity.Y = ((Sequence[i].Velocity.Y * Sequence[i].Shift.Z - Sequence[i].Velocity.Z * Sequence[i].Shift.Y + (Sequence[i].Accelerated.Y * Sequence[i].Shift.Z - Sequence[i].Shift.Y * Sequence[i].Accelerated.Z) * 时间差 + ((Sequence[i].Accelerated.Y * Sequence[i].Velocity.Z - Sequence[i].Velocity.Y * Sequence[i].Accelerated.Z) / 2) * 时间差 * 时间差) * ScalingFactor) / (ZZ * ZZ);
-        return TemporaryPointVelocity;
-    }
-    friend ostream& operator<<(ostream& output, const SequenceLocation& Inflection) {
-        for (int i = 0; i < Inflection.Sequence.size(); i++) {//求数组长度
-            output << " 第" << i << "点 " << " X位置坐标 " << Inflection.Sequence[i].Shift.X << " Y位置坐标 " << Inflection.Sequence[i].Shift.Y << " Z位置坐标 " << Inflection.Sequence[i].Shift.Z << " 时间 " << Inflection.Sequence[i].Time << endl;
-            output << " X位置速度 " << Inflection.Sequence[i].Velocity.X << " Y位置速度 " << Inflection.Sequence[i].Velocity.Y << " Z位置速度 " << Inflection.Sequence[i].Velocity.Z;
-            output << " X位置加速度 " << Inflection.Sequence[i].Accelerated.X << " Y位置加速度 " << Inflection.Sequence[i].Accelerated.Y << " Z位置加速度 " << Inflection.Sequence[i].Accelerated.Z << endl;
-        }
-        return output;
-    }
-};
-
-class SizeOfBox {//目标简单判定框大小随时间变化序列    复杂模型可以由多个框组成  这里暂时使用单个方框
-public:
-    double X;
-    double Y;
-    double T;
-public:
-    friend ostream& operator<<(ostream& output, const SizeOfBox& Box) {//重载cout输出
-        output << " 框X游戏位置大小 " << Box.X << " 框Y游戏位置大小 " << Box.Y<< " 框时间T "<< Box.T;
-        return output;
-    }
-};
-
 struct 目标总体 {//说实话 一些函数已经完全被序列替代了
-    SizeOfBox 目标游戏内大小序列[10];
+    SequenceBox 目标游戏内大小序列= SequenceBox(10);
     SequenceLocation 移动序列= SequenceLocation(100);
     int 目标血量;
     DecisionBox 目标在屏幕位置;
@@ -389,18 +426,6 @@ struct 枪械 {//枪械的一个集合 包含许多基本要素
     double 子弹散布参数;
     概率密度函数类型 子弹概率密度函数指针;
     概率密度函数类型 子弹概率累计函数指针;
-};
-
-struct 玩家技术 {//定义在最开始 后面有函数用到这个结构体
-    double 简单压枪倍率;
-    double 简单目标跟踪倍率;
-    double 压枪方向熟练程度;
-    double 压枪速度熟练程度;
-    double 压枪时间熟练程度;
-    double 跟枪速度熟练程度;
-    double 跟枪方向熟练程度;
-    double 反应力;
-    double 跟枪等级;
 };
 
 double 正态分布随机数(double 方差, double 期望)//见Box-Muller算法
@@ -471,16 +496,15 @@ double 子弹衰减(double 目标位置Z) {//子弹衰减函数   (瞎设的数�
     return 衰减倍率;
 }
 
-DecisionBox 实际位置函数(SequencePoint 后坐力序列, SequencePoint 压枪序列, SequenceLocation 目标移动序列, SequencePoint 跟枪序列, SizeOfBox* 目标大小实体,玩家技术 玩家技术实体, double 时间变量) {//这个是重载函数  就是名字一样但参数不一样的函数叫 重载
-    DecisionBox 临时变量={0,0,0,0};//
-    GameLocation 目标大小T时刻位置={10,10,0};
-    int 数组指针 = 0;
-    while (目标大小实体[数组指针 + 1].变形时间T <= 时间变量) {
-        数组指针++;
-        if (数组指针 >= 100) {
+DecisionBox 实际位置函数(SequencePoint 后坐力序列, SequencePoint 压枪序列, SequenceLocation 目标移动序列, SequencePoint 跟枪序列, SequenceBox 目标大小实体,玩家技术 玩家技术实体, double 时间变量) {//这个是重载函数  就是名字一样但参数不一样的函数叫 重载
+    DecisionBox 临时变量 = DecisionBox(0, 0, 0, 0);
+    GameLocation 目标大小T时刻位置 = GameLocation(10, 10, 0);
+    int i = 0;
+    for (i = 0; 目标大小实体.Sequence[i + 1].Time <= 时间变量; i++)//寻找一个Time[i]<时间<Time[i+1]的位置 下同
+        if (i + 2 >= 目标大小实体.Sequence.size()) {//找遍所以未找到对应  强制结束 
+            cout << 时间变量 <<"时间变量过长 (实际位置函数)" << endl;
             break;
         }
-    }
     ScreenPoint 后坐力偏差 = 后坐力序列.屏幕拐点型_转屏幕偏差函数(时间变量);
     ScreenPoint 压枪偏差 = 压枪序列.屏幕拐点型_转屏幕偏差函数(时间变量);
     GameLocation 目标移动位置 = 目标移动序列.实际拐点型_转实际位置函数(时间变量);
@@ -488,8 +512,9 @@ DecisionBox 实际位置函数(SequencePoint 后坐力序列, SequencePoint 压�
     if (目标移动位置.Z == 0) {//目标与玩家z轴位置为0 即完全贴合 这是不可能的 报错并返回
         return 临时变量;
     }
-    目标大小T时刻位置.X = 目标大小实体[数组指针].X_实际;
-    目标大小T时刻位置.Y = 目标大小实体[数组指针].Y_实际;
+    目标大小T时刻位置.X = 目标大小实体.Sequence[i].X;
+    目标大小T时刻位置.Y = 目标大小实体.Sequence[i].Y;
+    cout << " x: " << 目标大小T时刻位置.X << " y: " << 目标大小T时刻位置.Y <<" z: "<< 目标大小T时刻位置.Z<< endl;
     临时变量.LeftLower = (目标移动位置 - 目标大小T时刻位置 / 2).LocationToPoint() - 后坐力偏差 + 压枪偏差 - 跟枪偏差;
     临时变量.RightUpper = (目标移动位置 + 目标大小T时刻位置 / 2).LocationToPoint() - 后坐力偏差 + 压枪偏差 - 跟枪偏差;
     return 临时变量;
@@ -501,11 +526,11 @@ double 复杂模型累计概率形(枪械 枪械实体, 目标总体 目标实�
     double 命中概率 = 0;
     int i;
     SequencePoint 后座序列 = 枪械实体.枪械子弹序列;
-    SequencePoint 压枪序列= SequencePoint(100);
+    SequencePoint 压枪序列 = SequencePoint(100);
     SequenceLocation 移动序列 = 目标实体.移动序列;
-    ScreenPoint 移动屏幕序列;
-    SequencePoint 跟枪序列= SequencePoint(500);
-    DecisionBox 目标边框位置;
+    ScreenPoint 移动屏幕序列 = (0, 0);
+    SequencePoint 跟枪序列 = SequencePoint(500);
+    DecisionBox 目标边框位置 = DecisionBox(0, 0, 0, 0);
     后座序列.屏幕拐点位置_转速度函数();
     压枪序列.压枪函数(玩家实体, 后座序列);
     移动序列.实际拐点位置_转速度函数();
@@ -524,37 +549,39 @@ double 复杂模型累计概率形(枪械 枪械实体, 目标总体 目标实�
 int main()
 {
     srand(time(nullptr));
-    枪械 p2020;
-    目标总体 直布罗陀;
+    枪械 枪;
+    目标总体 目标;
     玩家技术 你;
     int i = 0;
     char 结束字符;
     {
-        p2020.武器伤害 = 18;
-        p2020.武器射速 = 7;
-        p2020.耗光时间 = 3.7;
-        p2020.子弹散布参数 = 2;//数字越大越准
-        p2020.子弹概率累计函数指针 = 正态分布累计概率密度;
-        p2020.子弹衰减函数指针 = 子弹衰减;
-        p2020.枪械子弹序列.Sequence[0] = { 0,0,0 };
-        p2020.枪械子弹序列.Sequence[1] = { -22,87,0.566 };
-        p2020.枪械子弹序列.Sequence[2] = { 8,140,0.866 };
-        p2020.枪械子弹序列.Sequence[3] = { -58,257,2.1 };
-        p2020.枪械子弹序列.Sequence[4] = { -19,305,3.06 };
-        p2020.枪械子弹序列.Sequence[5] = { -28,314,3.16 };
-        p2020.枪械子弹序列.Sequence[6] = { -6,332,3.7 };
+        枪.武器伤害 = 18;
+        枪.武器射速 = 7;
+        枪.耗光时间 = 3.7;
+        枪.子弹散布参数 = 2;//数字越大越准
+        枪.子弹概率累计函数指针 = 正态分布累计概率密度;
+        枪.子弹衰减函数指针 = 子弹衰减;
+        枪.枪械子弹序列.Sequence[0] = { 0,0,0 };
+        枪.枪械子弹序列.Sequence[1] = { -22,87,0.566 };
+        枪.枪械子弹序列.Sequence[2] = { 8,140,0.866 };
+        枪.枪械子弹序列.Sequence[3] = { -58,257,2.1 };
+        枪.枪械子弹序列.Sequence[4] = { -19,305,3.06 };
+        枪.枪械子弹序列.Sequence[5] = { -28,314,3.16 };
+        枪.枪械子弹序列.Sequence[6] = { -6,332,3.7 };
     }
     {
-        直布罗陀.目标血量 = 150;
-        直布罗陀.移动序列.Sequence[0] = { 0,0,10,0 };
-        直布罗陀.移动序列.Sequence[1] = { -100,100,10,0.5 };
-        直布罗陀.移动序列.Sequence[2] = { -200,200,11,1.0 };
-        直布罗陀.移动序列.Sequence[3] = { -300,300,12,1.5 };
-        直布罗陀.移动序列.Sequence[4] = { -400,400,13,2.0 };
-        直布罗陀.移动序列.Sequence[5] = { -500,500,14,2.5 };
-        直布罗陀.移动序列.Sequence[6] = { -600,600,15,3.0 };
-        直布罗陀.目标游戏内大小序列[0] = { 100,100,0 };
-        直布罗陀.目标游戏内大小序列[1] = { 100,100,10 };
+        目标.目标血量 = 150;
+        目标.移动序列.Sequence[0] = { 0,0,10,0 };
+        目标.移动序列.Sequence[1] = { -100,100,10,0.5 };
+        目标.移动序列.Sequence[2] = { -200,200,10,1.0 };
+        目标.移动序列.Sequence[3] = { -300,300,10,1.5 };
+        目标.移动序列.Sequence[4] = { -400,400,10,2.0 };
+        目标.移动序列.Sequence[5] = { -500,500,10,2.5 };
+        目标.移动序列.Sequence[6] = { -600,600,10,3.0 };
+        目标.移动序列.Sequence[7] = { -700,700,10,3.5 };
+        目标.移动序列.Sequence[8] = { -800,800,10,4.0 };
+        目标.目标游戏内大小序列.Sequence[0] = { 100.0,100.0,0 };
+        目标.目标游戏内大小序列.Sequence[1] = { 100.0,100.0,10.0 };
     }
     {
         你.压枪方向熟练程度 = 10;
@@ -567,5 +594,5 @@ int main()
         你.跟枪速度熟练程度 = 10;
         你.跟枪等级 = 1;
     }  
-    double 枪械总伤害 = 复杂模型累计概率形(p2020, 直布罗陀, 你, 1000);
+    复杂模型累计概率形(枪, 目标, 你, 1000);
 }
