@@ -3,9 +3,7 @@
 //没用c++的面向对象编程  (对象=结构体  方法=对结构体函数)
 //其实用面对对象编程可能好定义一些
 //VS编译器c语言居然可以中文  不该在建模搞首字母变量的   
-#include <math.h>
 #include <iostream>
-#include <cstdlib>
 #include <cmath>
 #include <limits>
 #include <opencv2/opencv.hpp>

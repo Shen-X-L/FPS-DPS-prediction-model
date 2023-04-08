@@ -3,27 +3,25 @@
 //没用c++的面向对象编程  (对象=结构体  方法=对结构体函数)
 //其实用面对对象编程可能好定义一些
 //VS编译器c语言居然可以中文  不该在建模搞首字母变量的   
-#include <math.h>
 #include <iostream>
-#include <cstdlib>
 #include <cmath>
-#include <vector>
 #include <limits>
+#include <opencv2/opencv.hpp>
+#include "cvui.h"
+using namespace cv;
+using namespace std;
+using namespace std::chrono;
 //子弹序列改为后坐力拐点序列
 const double PI = 3.14159265358979323846;
-
-double ScalingFactor = 1;
-double& 游戏距离到屏幕偏差放缩系数 = ScalingFactor;
+const double ScalingFactor = 1;
+const double& 游戏距离到屏幕偏差放缩系数 = ScalingFactor;
+const int 画布X宽度 = 900;
+const int 画布Y长度 = 900;
 
 typedef double(*概率密度函数类型)(double, double, double);
 typedef double(*子弹衰减函数类型)(double);
-
-using namespace std;
-
 double 正态分布随机数(double, double);
-
 struct 玩家技术;
-
 class ScreenPoint;
 class DecisionBox;
 class InflectionPoint;
@@ -60,6 +58,9 @@ public:
     bool operator==(const ScreenPoint& other) {
         if (X == other.X && Y == other.Y)return true;
         else return false;
+    }
+    Point SPtoP() {
+        return Point(X, Y);
     }
 };
 
@@ -514,7 +515,6 @@ DecisionBox 实际位置函数(SequencePoint 后坐力序列, SequencePoint 压�
     }
     目标大小T时刻位置.X = 目标大小实体.Sequence[i].X;
     目标大小T时刻位置.Y = 目标大小实体.Sequence[i].Y;
-    cout << " x: " << 目标大小T时刻位置.X << " y: " << 目标大小T时刻位置.Y <<" z: "<< 目标大小T时刻位置.Z<< endl;
     临时变量.LeftLower = (目标移动位置 - 目标大小T时刻位置 / 2).LocationToPoint() - 后坐力偏差 + 压枪偏差 - 跟枪偏差;
     临时变量.RightUpper = (目标移动位置 + 目标大小T时刻位置 / 2).LocationToPoint() - 后坐力偏差 + 压枪偏差 - 跟枪偏差;
     return 临时变量;
@@ -545,6 +545,86 @@ double 复杂模型累计概率形(枪械 枪械实体, 目标总体 目标实�
     return 临时伤害总和变量;
 };
 
+void 目标运动绘制函数(SequenceLocation 目标移动, double Time, Mat& frame, ScreenPoint Now, ScreenPoint 中心, ScreenPoint 目标移动偏差);
+void 显示函数(SequencePoint 后坐力拐点, SequencePoint 压枪拐点, SequenceLocation 目标移动, SequencePoint 跟枪拐点)
+{
+    // 创建窗口
+    int i;
+    int j;
+    for (i = 0; 后坐力拐点.Sequence[i + 1].Time != 0; i++) {
+    }
+    cout << i;
+    namedWindow("Animation", WINDOW_NORMAL);
+
+    // 设置动画帧率
+    int fps = 144;
+    int delay = 1000 / fps;
+
+    // 计算动画总时长
+    double totalTime = 后坐力拐点.Sequence[i].Time - 后坐力拐点.Sequence[0].Time;
+
+    // 记录动画开始时间
+    auto start = high_resolution_clock::now();
+    ScreenPoint 准心距中心偏移 = ScreenPoint(0, 0);
+    ScreenPoint 中心画面坐标 = ScreenPoint((double)画布X宽度 / 2, (double)画布Y长度 / 2);
+
+    // 循环播放动画
+    while (true)
+    {
+        // 计算当前时间点
+        auto now = high_resolution_clock::now();
+        double elapsed = duration_cast<duration<double>>(now - start).count();
+        double Time = fmod(elapsed, totalTime);// a/b的余数
+        // 清空画布
+        Mat frame(画布X宽度, 画布Y长度, CV_8UC3, Scalar(255, 255, 255));
+        //绘制准星
+        line(frame, Point(画布X宽度 / 2, 画布Y长度 / 2 - 20), Point(画布X宽度 / 2, 画布Y长度 / 2 + 20), Scalar(0, 0, 0), 2, LINE_AA);
+        line(frame, Point(画布X宽度 / 2 - 20, 画布Y长度 / 2), Point(画布X宽度 / 2 + 20, 画布Y长度 / 2), Scalar(0, 0, 0), 2, LINE_AA);
+
+        // 计算当前点位置
+        ScreenPoint 后坐力偏差 = 后坐力拐点.屏幕拐点型_转屏幕偏差函数(Time);
+        ScreenPoint 压枪偏差 = 压枪拐点.屏幕拐点型_转屏幕偏差函数(Time);
+        ScreenPoint 目标移动偏差 = 目标移动.实际拐点型_转实际位置函数(Time).LocationToPoint();
+        ScreenPoint 跟枪偏差 = 跟枪拐点.屏幕拐点型_转屏幕偏差函数(Time);
+
+        //计算现在点距离开始点坐标
+        准心距中心偏移 = 压枪偏差 - 后坐力偏差 - 跟枪偏差;
+        // 绘制后坐力直线
+        for (j = 0; 后坐力拐点.Sequence[j + 1].Time < Time; j++) {
+            line(frame, ((后坐力拐点.Sequence[j].Shift + 准心距中心偏移) * (-1) + 中心画面坐标).SPtoP(), ((后坐力拐点.Sequence[j + 1].Shift + 准心距中心偏移) * (-1) + 中心画面坐标).SPtoP(), Scalar(0, 0, 0), 2, LINE_AA);
+        }
+        line(frame, ((后坐力拐点.Sequence[j].Shift + 准心距中心偏移) * (-1) + 中心画面坐标).SPtoP(), ((后坐力偏差 + 准心距中心偏移) * (-1) + 中心画面坐标).SPtoP(), Scalar(0, 0, 0), 2, LINE_AA);
+        //绘制压枪曲线
+        for (j = 0; 压枪拐点.Sequence[j + 1].Time < Time; j++) {
+            line(frame, ((压枪拐点.Sequence[j].Shift - 跟枪偏差) * (-1) + 中心画面坐标).SPtoP(), ((压枪拐点.Sequence[j + 1].Shift - 跟枪偏差) * (-1) + 中心画面坐标).SPtoP(), Scalar(0, 0, 255), 2, LINE_AA);
+        }
+        line(frame, ((压枪拐点.Sequence[j].Shift - 跟枪偏差) * (-1) + 中心画面坐标).SPtoP(), ((压枪偏差 - 跟枪偏差) * (-1) + 中心画面坐标).SPtoP(), Scalar(0, 0, 255), 2, LINE_AA);
+        //绘制移动近似曲线
+        目标运动绘制函数(目标移动, Time, frame, 准心距中心偏移, 中心画面坐标, 目标移动偏差);
+        //绘制跟枪曲线
+        for (j = 0; 跟枪拐点.Sequence[j + 1].Time < Time; j++) {
+            line(frame, ((跟枪拐点.Sequence[j].Shift - 跟枪偏差) * (-1) + 中心画面坐标).SPtoP(), ((跟枪拐点.Sequence[j + 1].Shift - 跟枪偏差) * (-1) + 中心画面坐标).SPtoP(), Scalar(255, 0, 0), 2, LINE_AA);
+        }
+        line(frame, ((跟枪拐点.Sequence[j].Shift - 跟枪偏差) * (-1) + 中心画面坐标).SPtoP(), ((跟枪偏差 - 跟枪偏差) * (-1) + 中心画面坐标).SPtoP(), Scalar(255, 0, 0), 2, LINE_AA);
+
+        // 显示画面
+        imshow("Animation", frame);
+
+        // 等待一段时间
+        if (waitKey(delay) == 27) break;
+    }
+    return;
+};
+
+void 目标运动绘制函数(SequenceLocation 目标移动, double Time, Mat& frame, ScreenPoint Now, ScreenPoint 中心, ScreenPoint 目标移动偏差) {
+    int j;
+    for (j = 0; 目标移动.Sequence[j + 1].Time < Time; j++) {
+        
+        line(frame, ((目标移动.Sequence[j].Shift.LocationToPoint() + Now) * (-1) + 中心).SPtoP(), ((目标移动.Sequence[j + 1].Shift.LocationToPoint() + Now) * (-1) + 中心).SPtoP(), Scalar(0, 255, 0), 2, LINE_AA);
+    }
+    line(frame, ((目标移动.Sequence[j].Shift.LocationToPoint() + Now) * (-1) + 中心).SPtoP(),((目标移动偏差 + Now) * (-1) + 中心).SPtoP(), Scalar(0, 255, 0), 2, LINE_AA);
+    return;
+}
 
 int main()
 {
@@ -567,7 +647,7 @@ int main()
         枪.枪械子弹序列.Sequence[3] = { -58,257,2.1 };
         枪.枪械子弹序列.Sequence[4] = { -19,305,3.06 };
         枪.枪械子弹序列.Sequence[5] = { -28,314,3.16 };
-        枪.枪械子弹序列.Sequence[6] = { -6,332,3.7 };
+        枪.枪械子弹序列.Sequence[6] = { -6,332,3.8 };
     }
     {
         目标.目标血量 = 150;
@@ -595,4 +675,15 @@ int main()
         你.跟枪等级 = 1;
     }  
     复杂模型累计概率形(枪, 目标, 你, 1000);
+    SequencePoint 后座序列 = 枪.枪械子弹序列;
+    SequencePoint 压枪序列 = SequencePoint(100);
+    SequenceLocation 移动序列 = 目标.移动序列;
+    ScreenPoint 移动屏幕序列 = (0, 0);
+    SequencePoint 跟枪序列 = SequencePoint(500);
+    DecisionBox 目标边框位置 = DecisionBox(0, 0, 0, 0);
+    后座序列.屏幕拐点位置_转速度函数();
+    压枪序列.压枪函数(你, 后座序列);
+    移动序列.实际拐点位置_转速度函数();
+    跟枪序列.跟枪函数(后座序列, 压枪序列, 移动序列, 你);
+    显示函数(后座序列, 压枪序列, 移动序列, 跟枪序列);
 }

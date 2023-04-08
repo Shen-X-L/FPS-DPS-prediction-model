@@ -4,7 +4,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <IncludePath>D:\编程\opencv\build\include;D:\编程\opencv\build\include\opencv2;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\编程\opencv\build\x64\vc16\lib;build\x64\vc16\lib;$(LibraryPath)</LibraryPath>
+    <LibraryPath>D:\编程\opencv\build\x64\vc16\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <Link>
