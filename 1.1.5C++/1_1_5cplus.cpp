@@ -1,8 +1,4 @@
-﻿// ConsoleApplication1.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
-//
-//没用c++的面向对象编程  (对象=结构体  方法=对结构体函数)
-//其实用面对对象编程可能好定义一些
-//VS编译器c语言居然可以中文  不该在建模搞首字母变量的   
+﻿
 #include <iostream>
 #include <cmath>
 #include <limits>
@@ -13,6 +9,7 @@ using namespace std;
 using namespace std::chrono;
 //子弹序列改为后坐力拐点序列
 const double PI = 3.14159265358979323846;
+const double MAX_TIME = 15.0;
 const double ScalingFactor = 1;
 const double& 游戏距离到屏幕偏差放缩系数 = ScalingFactor;
 const int 画布X宽度 = 900;
@@ -173,7 +170,7 @@ public:
         int i;
         for (i = 0; Sequence[i + 1].Time <= 时间变量; i++)//寻找一个Time[i]<时间<Time[i+1]的位置 下同
             if (i + 2 >= Sequence.size()) {//找遍所以未找到对应  强制结束
-                cout << 时间变量 << "时间变量过长 (实际拐点型_转屏幕偏差函数)" << endl;
+  //              cout << 时间变量 << "时间变量过长 (实际拐点型_转屏幕偏差函数)" << endl;
                 return (0, 0);//以后写成抛出异常
             }
         double 时间差 = 时间变量 - Sequence[i].Time;
@@ -216,6 +213,15 @@ public:
         }
         return output;
     }
+    void 序列缩减() {
+        int j = Sequence.size();
+        int i;
+        for (i = 1; Sequence[i].Time != 0; i++) {
+        }
+        for (i = i + 1; i < j; i++) {
+            Sequence.pop_back();
+        }
+    };
 };
 
 class DecisionBox {//判定框长宽
@@ -263,10 +269,28 @@ public:
 public:
     friend ostream& operator<<(ostream& output, const SequenceBox& Box) {//重载cout输出
         for (int i = 0; i < Box.Sequence.size(); i++) {//求数组长度
-            output << " 第" << i << "点 " << " X位置坐标 " << Box.Sequence[i];
+            output << " 第" << i << "点 " << Box.Sequence[i];
         }
         return output;
     }
+    GameLocation BoxToLocation(double time) {
+        int i;
+        for (i = 0; Sequence[i + 1].Time <= time; i++)//寻找一个Time[i]<时间<Time[i+1]的位置 下同
+            if (i + 2 >= Sequence.size()) {//找遍所以未找到对应  强制结束 
+                cout << time << "时间变量过长 (实际位置函数)" << endl;
+                break;
+            }
+        return GameLocation(Sequence[i].X, Sequence[i].Y, 0);
+    }
+    void 序列缩减() {
+        int j = Sequence.size();
+        int i;
+        for (i = 1; Sequence[i].Time != 0; i++) {
+        }
+        for (i = i + 1; i < j; i++) {
+            Sequence.pop_back();
+        }
+    };
 };
 
 struct 玩家技术 {//定义在最开始 后面有函数用到这个结构体
@@ -318,7 +342,7 @@ public:
         int i;
         for (i = 0; Sequence[i + 1].Time <= 时间变量; i++)//寻找一个Time[i]<时间<Time[i+1]的位置 下同  
             if (i + 2 >= Sequence.size()) {//找遍所以未找到对应  强制结束    i+2的解释 首先原句为while([i + 1].Time <= 时间变量)                                              i++
-                cout << 时间变量 << "时间变量过长 (屏幕拐点型_转屏幕偏差函数)" << endl;//                           i++                                              
+     //           cout << 时间变量 << "时间变量过长 (屏幕拐点型_转屏幕偏差函数)" << endl;//                           i++                                              
                 return ScreenPoint(0, 0);//以后写成抛出异常                                           if (i + 1 >= Sequence.size())           
             }//但是 for的i++是最后执行的  所以 i++ 和 i + 1 >= Sequence.size() 和为  i + 2 >= Sequence.size()
         double 时间差 = 时间变量 - Sequence[i].Time;
@@ -328,7 +352,7 @@ public:
         int i;
         for (i = 0; Sequence[i + 1].Time <= 时间变量; i++)//寻找一个Time[i]<时间<Time[i+1]的位置 下同
             if (i + 2 >= Sequence.size()) {//找遍所以未找到对应  强制结束 
-                cout << 时间变量 << "时间变量过长 (屏幕拐点型_转屏幕速度偏差函数)" << endl;
+     //           cout << 时间变量 << "时间变量过长 (屏幕拐点型_转屏幕速度偏差函数)" << endl;
                 return (0, 0);//以后写成抛出异常
             }
         return (Sequence[i].Velocity + Sequence[i].Accelerated * (时间变量 - Sequence[i].Time));
@@ -341,20 +365,24 @@ public:
         return output;
     }
     void 压枪函数(玩家技术 玩家技术实体, SequencePoint 后坐力序列) {//详细解释见文档
-        int i;
+        int i = 0;
         int j = 1;
         ScreenPoint TemporaryPointVelocity;
         double 压枪结束到拐点时间间隔;
         double 速度误差;
         double 方向误差;
         double 时间误差;
-        for (i = 0; (i + j) < 后坐力序列.Sequence.size(); i++) {//遍历后坐力序列
-            if (后坐力序列.Sequence[i + j].Time == 0) {//后坐力序列到达尽头  强制结束
+        for (i = 0; i < Sequence.size();) { //遍历后坐力序列
+            if (后坐力序列.Sequence[j + i].Time == 0) {//后坐力序列到达尽头  强制结束
+                if (后坐力序列.Sequence[j + i - 1].Time > Sequence[i].Time) {//修正压枪时间<后座时间  导致序列过短报错
+                    Sequence[i + 1] = Sequence[i];
+                    Sequence[i + 1].Time = 后坐力序列.Sequence[j + i - 1].Time;
+                }
                 break;
             }
-            if (后坐力序列.Sequence[i + j].Time > Sequence[i].Time) {
-                压枪结束到拐点时间间隔 = 后坐力序列.Sequence[i + j].Time - Sequence[i].Time;
-                TemporaryPointVelocity = (后坐力序列.Sequence[i + j].Shift - Sequence[i].Shift) / 压枪结束到拐点时间间隔;
+            if (后坐力序列.Sequence[j + i].Time > Sequence[i].Time) {
+                压枪结束到拐点时间间隔 = 后坐力序列.Sequence[j + i].Time - Sequence[i].Time;
+                TemporaryPointVelocity = (后坐力序列.Sequence[j + i].Shift - Sequence[i].Shift) / 压枪结束到拐点时间间隔;
                 速度误差 = 正态分布随机数((double)(1 / 玩家技术实体.压枪速度熟练程度), 0);
                 方向误差 = 正态分布随机数((double)(1 / 玩家技术实体.压枪方向熟练程度), 0) * PI;
                 时间误差 = 正态分布随机数((double)(1 / 玩家技术实体.压枪时间熟练程度), 0);
@@ -362,10 +390,10 @@ public:
                 Sequence[i + 1].Shift = Sequence[i].Shift + Sequence[i].Velocity * (压枪结束到拐点时间间隔 * (1 + 时间误差));
                 Sequence[i + 1].Time = Sequence[i].Time + (压枪结束到拐点时间间隔 * (1 + 时间误差));
                 Sequence[i].Accelerated = (0, 0);
+                i++;
             }
             else {
                 j++;
-                i--;
             }
         }
     };
@@ -403,6 +431,15 @@ public:
             Sequence[i].Accelerated = (0, 0);
             Sequence[i + 1].Time = (i + 1) * 玩家技术实体.反应力;
             Sequence[i + 1].Shift = Sequence[i].Shift + Sequence[i].Velocity * (玩家技术实体.反应力) + (Sequence[i].Accelerated / 2) * (玩家技术实体.反应力) * (玩家技术实体.反应力);
+        }
+    };
+    void 序列缩减() {
+        int j = Sequence.size();
+        int i;
+        for (i = 1; Sequence[i].Time != 0; i++) {
+        }
+        for (i = i + 1; i < j; i++) {
+            Sequence.pop_back();
         }
     };
 };
@@ -443,9 +480,9 @@ double 正态分布随机数(double 方差, double 期望)//见Box-Muller算法
     return 正态分布随机数 * 方差 + 期望;
 };
 
-double 正态分布概率密度函数(double X, double Y,double 方差倒数) {//正态分布概率密度方差倒数   描述准星扩散大小   值越大越集中   (为什么不用方差  方差数小时 1/方差  误差会被放大)
+double 正态分布概率密度函数(double X, double Y,double 方差) {//正态分布概率密度方差   描述准星扩散大小   值越大越散  
     double 概率 = 0;//子弹击中X,Y的概率
-    概率=(1 * 方差倒数 * 方差倒数) / (PI * 2) * exp(-((X * X + Y * Y) * 方差倒数 * 方差倒数) / 2);
+    概率=1/ (PI * 2*方差 *方差) * exp(-((X * X + Y * Y) / (方差 * 方差)) / 2);
     return 概率;
 }
 
@@ -457,9 +494,9 @@ double 均匀分布概率密度(double X, double Y, double 边界) {//子弹散�
     return 概率;
 }
 
-double 正态分布累计概率密度(double X, double Y,double 方差倒数) {//子弹散布累计概率密度 既子弹击中属于(-无穷,X)(-无穷,Y)大片区域的概率
+double 正态分布累计概率密度(double X, double Y,double 方差) {//子弹散布累计概率密度 既子弹击中属于(-无穷,X)(-无穷,Y)大片区域的概率
     double 概率 = 0;//子弹击中X,Y的概率
-    概率 = (erf(X * 方差倒数 / sqrt(2)) + 1) / 2 * (erf(Y * 方差倒数 / sqrt(2)) + 1) / 2;//我是sb  这么简单的函数找了好久没找到还想自己写
+    概率 = (erf(X / 方差 / sqrt(2)) + 1) / 2 * (erf(Y / 方差 / sqrt(2)) + 1) / 2;//我是sb  这么简单的函数找了好久没找到还想自己写
     return 概率;
 }
 
@@ -497,34 +534,27 @@ double 子弹衰减(double 目标位置Z) {//子弹衰减函数   (瞎设的数�
     return 衰减倍率;
 }
 
-DecisionBox 实际位置函数(SequencePoint 后坐力序列, SequencePoint 压枪序列, SequenceLocation 目标移动序列, SequencePoint 跟枪序列, SequenceBox 目标大小实体,玩家技术 玩家技术实体, double 时间变量) {//这个是重载函数  就是名字一样但参数不一样的函数叫 重载
+DecisionBox 实际位置函数(SequencePoint 后坐力序列, SequencePoint 压枪序列, SequenceLocation 目标移动序列, SequencePoint 跟枪序列, SequenceBox 目标大小实体,玩家技术 玩家技术实体, double Time) {//这个是重载函数  就是名字一样但参数不一样的函数叫 重载
     DecisionBox 临时变量 = DecisionBox(0, 0, 0, 0);
-    GameLocation 目标大小T时刻位置 = GameLocation(10, 10, 0);
-    int i = 0;
-    for (i = 0; 目标大小实体.Sequence[i + 1].Time <= 时间变量; i++)//寻找一个Time[i]<时间<Time[i+1]的位置 下同
-        if (i + 2 >= 目标大小实体.Sequence.size()) {//找遍所以未找到对应  强制结束 
-            cout << 时间变量 <<"时间变量过长 (实际位置函数)" << endl;
-            break;
-        }
-    ScreenPoint 后坐力偏差 = 后坐力序列.屏幕拐点型_转屏幕偏差函数(时间变量);
-    ScreenPoint 压枪偏差 = 压枪序列.屏幕拐点型_转屏幕偏差函数(时间变量);
-    GameLocation 目标移动位置 = 目标移动序列.实际拐点型_转实际位置函数(时间变量);
-    ScreenPoint 跟枪偏差 = 跟枪序列.屏幕拐点型_转屏幕偏差函数(时间变量);
+    GameLocation 目标大小T时刻位置 = 目标大小实体.BoxToLocation(Time);
+    ScreenPoint 后坐力偏差 = 后坐力序列.屏幕拐点型_转屏幕偏差函数(Time);
+    ScreenPoint 压枪偏差 = 压枪序列.屏幕拐点型_转屏幕偏差函数(Time);
+    GameLocation 目标移动位置 = 目标移动序列.实际拐点型_转实际位置函数(Time);
+    ScreenPoint 跟枪偏差 = 跟枪序列.屏幕拐点型_转屏幕偏差函数(Time);
     if (目标移动位置.Z == 0) {//目标与玩家z轴位置为0 即完全贴合 这是不可能的 报错并返回
         return 临时变量;
     }
-    目标大小T时刻位置.X = 目标大小实体.Sequence[i].X;
-    目标大小T时刻位置.Y = 目标大小实体.Sequence[i].Y;
     临时变量.LeftLower = (目标移动位置 - 目标大小T时刻位置 / 2).LocationToPoint() - 后坐力偏差 + 压枪偏差 - 跟枪偏差;
     临时变量.RightUpper = (目标移动位置 + 目标大小T时刻位置 / 2).LocationToPoint() - 后坐力偏差 + 压枪偏差 - 跟枪偏差;
     return 临时变量;
 };
 
-double 复杂模型累计概率形(枪械 枪械实体, 目标总体 目标实体,玩家技术 玩家实体, int 运算精度) {//无压枪 目标无位移 
+double 复杂模型累计概率形(枪械 枪械实体, 目标总体 目标实体,玩家技术 玩家实体, int 运算精度,double& 击杀时间,int 目标血量) {//无压枪 目标无位移 
     double 临时伤害总和变量 = 0;
     double 时间变量 = 0;
     double 命中概率 = 0;
     int i;
+    bool 击杀判定 = true;//true表示未击杀  false表示击杀  有些反逻辑但是在下面语句好用
     SequencePoint 后座序列 = 枪械实体.枪械子弹序列;
     SequencePoint 压枪序列 = SequencePoint(100);
     SequenceLocation 移动序列 = 目标实体.移动序列;
@@ -532,21 +562,59 @@ double 复杂模型累计概率形(枪械 枪械实体, 目标总体 目标实�
     SequencePoint 跟枪序列 = SequencePoint(500);
     DecisionBox 目标边框位置 = DecisionBox(0, 0, 0, 0);
     后座序列.屏幕拐点位置_转速度函数();
+    后座序列.序列缩减();
     压枪序列.压枪函数(玩家实体, 后座序列);
+    压枪序列.序列缩减();
     移动序列.实际拐点位置_转速度函数();
+    移动序列.序列缩减();
     跟枪序列.跟枪函数(后座序列, 压枪序列, 移动序列, 玩家实体);
+    跟枪序列.序列缩减();
     for (i = 0; i < 枪械实体.耗光时间 * 运算精度; i++) {
         时间变量 = (double)i / (double)运算精度;
         目标边框位置 = 实际位置函数(后座序列, 压枪序列, 移动序列, 跟枪序列, 目标实体.目标游戏内大小序列, 玩家实体, 时间变量);
         命中概率 = 目标边框位置.HitRate(枪械实体.子弹概率累计函数指针, 枪械实体.子弹散布参数);
         临时伤害总和变量 = 临时伤害总和变量 + 命中概率 * 枪械实体.武器伤害 * 枪械实体.武器射速 * 枪械实体.子弹衰减函数指针(移动序列.实际拐点型_转实际位置函数(时间变量).Z) / (double)运算精度;
-        cout<<" 总伤害 " << 临时伤害总和变量<< 目标边框位置<< "时间" << 时间变量<<endl;
+        if (目标血量 < 临时伤害总和变量&& 击杀判定) {
+            击杀时间 = (double)i / (double)运算精度;
+            击杀判定 = false;
+        }
+ //      cout<<" 总伤害 " << 临时伤害总和变量<< 目标边框位置<< "时间" << 时间变量<<endl;
     }
+    if (击杀判定)
+        cout << "单弹夹未击杀目标" << endl;
+    else
+        cout << "单弹夹在"<<击杀时间<<"击杀目标" << endl;
     return 临时伤害总和变量;
 };
 
-void 目标运动绘制函数(SequenceLocation 目标移动, double Time, Mat& frame, ScreenPoint Now, ScreenPoint 中心, ScreenPoint 目标移动偏差);
-void 显示函数(SequencePoint 后坐力拐点, SequencePoint 压枪拐点, SequenceLocation 目标移动, SequencePoint 跟枪拐点)
+void 改进TTK计算(枪械 枪械实体, 目标总体 目标实体, 玩家技术 玩家实体, int DPS运算精度,int 运算次数) {
+    double 单弹夹总输出;
+    double 临时血量;
+    double 改进TTK;
+    double sum = 0;
+    double 击杀时间;
+    for (int i = 0; i < 运算次数; i++) {
+        改进TTK = 0;
+        临时血量 = 目标实体.目标血量;
+        单弹夹总输出 = 复杂模型累计概率形(枪械实体, 目标实体, 玩家实体, DPS运算精度,击杀时间, 临时血量);
+        for (; 单弹夹总输出 < 临时血量;) {
+            改进TTK = 改进TTK + 枪械实体.耗光时间 + 枪械实体.换弹时间;
+            临时血量 = 临时血量-单弹夹总输出;
+            单弹夹总输出 = 复杂模型累计概率形(枪械实体, 目标实体, 玩家实体, DPS运算精度,击杀时间, 临时血量);
+        }
+            改进TTK = 改进TTK+ 击杀时间;
+       cout << 改进TTK << endl;
+        sum = sum + 改进TTK;
+    }
+    cout << sum / 运算次数;
+}
+
+
+
+
+void 目标运动绘制函数(SequenceLocation, double, Mat&, ScreenPoint, ScreenPoint, GameLocation, GameLocation);
+
+void 显示函数(SequencePoint 后坐力拐点, SequencePoint 压枪拐点, SequenceLocation 目标移动, SequencePoint 跟枪拐点,SequenceBox 目标大小,double 散布)
 {
     // 创建窗口
     int i;
@@ -578,30 +646,34 @@ void 显示函数(SequencePoint 后坐力拐点, SequencePoint 压枪拐点, Seq
         // 清空画布
         Mat frame(画布X宽度, 画布Y长度, CV_8UC3, Scalar(255, 255, 255));
         //绘制准星
-        line(frame, Point(画布X宽度 / 2, 画布Y长度 / 2 - 20), Point(画布X宽度 / 2, 画布Y长度 / 2 + 20), Scalar(0, 0, 0), 2, LINE_AA);
-        line(frame, Point(画布X宽度 / 2 - 20, 画布Y长度 / 2), Point(画布X宽度 / 2 + 20, 画布Y长度 / 2), Scalar(0, 0, 0), 2, LINE_AA);
+        line(frame, Point(画布X宽度 / 2, 画布Y长度 / 2 + 散布 * 3), Point(画布X宽度 / 2, 画布Y长度 / 2 + 散布 * 3 + 10), Scalar(0, 0, 0), 2, LINE_AA);
+        line(frame, Point(画布X宽度 / 2 + 散布 * 3, 画布Y长度 / 2), Point(画布X宽度 / 2 + 散布 * 3 + 10, 画布Y长度 / 2), Scalar(0, 0, 0), 2, LINE_AA);
+        line(frame, Point(画布X宽度 / 2, 画布Y长度 / 2 - 散布 * 3), Point(画布X宽度 / 2, 画布Y长度 / 2 - 散布 * 3 - 10), Scalar(0, 0, 0), 2, LINE_AA);
+        line(frame, Point(画布X宽度 / 2 - 散布 * 3, 画布Y长度 / 2), Point(画布X宽度 / 2 - 散布 * 3 - 10, 画布Y长度 / 2), Scalar(0, 0, 0), 2, LINE_AA);
 
         // 计算当前点位置
+        GameLocation 目标大小T时刻位置 = 目标大小.BoxToLocation(Time);
         ScreenPoint 后坐力偏差 = 后坐力拐点.屏幕拐点型_转屏幕偏差函数(Time);
         ScreenPoint 压枪偏差 = 压枪拐点.屏幕拐点型_转屏幕偏差函数(Time);
-        ScreenPoint 目标移动偏差 = 目标移动.实际拐点型_转实际位置函数(Time).LocationToPoint();
+        GameLocation 目标移动偏差 = 目标移动.实际拐点型_转实际位置函数(Time);
         ScreenPoint 跟枪偏差 = 跟枪拐点.屏幕拐点型_转屏幕偏差函数(Time);
+
 
         //计算现在点距离开始点坐标
         准心距中心偏移 = 压枪偏差 - 后坐力偏差 - 跟枪偏差;
-        // 绘制后坐力直线
+        // 绘制后坐力直线  0,0,0 黑色
         for (j = 0; 后坐力拐点.Sequence[j + 1].Time < Time; j++) {
             line(frame, ((后坐力拐点.Sequence[j].Shift + 准心距中心偏移) * (-1) + 中心画面坐标).SPtoP(), ((后坐力拐点.Sequence[j + 1].Shift + 准心距中心偏移) * (-1) + 中心画面坐标).SPtoP(), Scalar(0, 0, 0), 2, LINE_AA);
         }
         line(frame, ((后坐力拐点.Sequence[j].Shift + 准心距中心偏移) * (-1) + 中心画面坐标).SPtoP(), ((后坐力偏差 + 准心距中心偏移) * (-1) + 中心画面坐标).SPtoP(), Scalar(0, 0, 0), 2, LINE_AA);
-        //绘制压枪曲线
+        //绘制压枪曲线   0,0,255 红色
         for (j = 0; 压枪拐点.Sequence[j + 1].Time < Time; j++) {
             line(frame, ((压枪拐点.Sequence[j].Shift - 跟枪偏差) * (-1) + 中心画面坐标).SPtoP(), ((压枪拐点.Sequence[j + 1].Shift - 跟枪偏差) * (-1) + 中心画面坐标).SPtoP(), Scalar(0, 0, 255), 2, LINE_AA);
         }
         line(frame, ((压枪拐点.Sequence[j].Shift - 跟枪偏差) * (-1) + 中心画面坐标).SPtoP(), ((压枪偏差 - 跟枪偏差) * (-1) + 中心画面坐标).SPtoP(), Scalar(0, 0, 255), 2, LINE_AA);
-        //绘制移动近似曲线
-        目标运动绘制函数(目标移动, Time, frame, 准心距中心偏移, 中心画面坐标, 目标移动偏差);
-        //绘制跟枪曲线
+        //绘制移动近似曲线  目标移动线 0,255,0 绿色   判定框 255,255,0青色
+        目标运动绘制函数(目标移动, Time, frame, 准心距中心偏移, 中心画面坐标, 目标移动偏差, 目标大小T时刻位置);
+        //绘制跟枪曲线  255,0,0蓝色
         for (j = 0; 跟枪拐点.Sequence[j + 1].Time < Time; j++) {
             line(frame, ((跟枪拐点.Sequence[j].Shift - 跟枪偏差) * (-1) + 中心画面坐标).SPtoP(), ((跟枪拐点.Sequence[j + 1].Shift - 跟枪偏差) * (-1) + 中心画面坐标).SPtoP(), Scalar(255, 0, 0), 2, LINE_AA);
         }
@@ -616,13 +688,14 @@ void 显示函数(SequencePoint 后坐力拐点, SequencePoint 压枪拐点, Seq
     return;
 };
 
-void 目标运动绘制函数(SequenceLocation 目标移动, double Time, Mat& frame, ScreenPoint Now, ScreenPoint 中心, ScreenPoint 目标移动偏差) {
+void 目标运动绘制函数(SequenceLocation 目标移动, double Time, Mat& frame, ScreenPoint Now, ScreenPoint 中心, GameLocation 目标移动偏差, GameLocation 目标大小) {
     int j;
     for (j = 0; 目标移动.Sequence[j + 1].Time < Time; j++) {
         
         line(frame, ((目标移动.Sequence[j].Shift.LocationToPoint() + Now) * (-1) + 中心).SPtoP(), ((目标移动.Sequence[j + 1].Shift.LocationToPoint() + Now) * (-1) + 中心).SPtoP(), Scalar(0, 255, 0), 2, LINE_AA);
     }
-    line(frame, ((目标移动.Sequence[j].Shift.LocationToPoint() + Now) * (-1) + 中心).SPtoP(),((目标移动偏差 + Now) * (-1) + 中心).SPtoP(), Scalar(0, 255, 0), 2, LINE_AA);
+    line(frame, ((目标移动.Sequence[j].Shift.LocationToPoint() + Now) * (-1) + 中心).SPtoP(),((目标移动偏差.LocationToPoint() + Now) * (-1) + 中心).SPtoP(), Scalar(0, 255, 0), 2, LINE_AA);
+    rectangle(frame, (((目标移动偏差 + 目标大小 / 2).LocationToPoint() + Now) * (-1) + 中心).SPtoP(), (((目标移动偏差 - 目标大小 / 2).LocationToPoint() + Now)* (-1) + 中心).SPtoP(), Scalar(255, 255, 0), 2, LINE_AA);
     return;
 }
 
@@ -636,9 +709,9 @@ int main()
     char 结束字符;
     {
         枪.武器伤害 = 18;
-        枪.武器射速 = 7;
-        枪.耗光时间 = 3.7;
-        枪.子弹散布参数 = 2;//数字越大越准
+        枪.武器射速 = 9;
+        枪.耗光时间 = 3.88;
+        枪.子弹散布参数 = 10;//数字越大越散   在 x范围[-参数,参数]y范围[-参数,参数]的方格命中到达0.47  [-参数*2,参数*2][-参数*2,参数*2] 的方格命中到达0.91   [-参数*3,参数*3][-参数*3,参数*3] 的方格命中到达0.99
         枪.子弹概率累计函数指针 = 正态分布累计概率密度;
         枪.子弹衰减函数指针 = 子弹衰减;
         枪.枪械子弹序列.Sequence[0] = { 0,0,0 };
@@ -647,43 +720,54 @@ int main()
         枪.枪械子弹序列.Sequence[3] = { -58,257,2.1 };
         枪.枪械子弹序列.Sequence[4] = { -19,305,3.06 };
         枪.枪械子弹序列.Sequence[5] = { -28,314,3.16 };
-        枪.枪械子弹序列.Sequence[6] = { -6,332,3.8 };
+        枪.枪械子弹序列.Sequence[6] = { -6,332,3.7 };
+        枪.枪械子弹序列.Sequence[7] = { 42,375,4.7 };
+        枪.枪械子弹序列.Sequence[8] = { 30,420,5 };
+        枪.枪械子弹序列.Sequence[8] = { 30,420,5.1 };
+        枪.换弹时间 = 2;
     }
     {
-        目标.目标血量 = 150;
         目标.移动序列.Sequence[0] = { 0,0,10,0 };
-        目标.移动序列.Sequence[1] = { -100,100,10,0.5 };
-        目标.移动序列.Sequence[2] = { -200,200,10,1.0 };
-        目标.移动序列.Sequence[3] = { -300,300,10,1.5 };
-        目标.移动序列.Sequence[4] = { -400,400,10,2.0 };
-        目标.移动序列.Sequence[5] = { -500,500,10,2.5 };
-        目标.移动序列.Sequence[6] = { -600,600,10,3.0 };
-        目标.移动序列.Sequence[7] = { -700,700,10,3.5 };
-        目标.移动序列.Sequence[8] = { -800,800,10,4.0 };
-        目标.目标游戏内大小序列.Sequence[0] = { 100.0,100.0,0 };
-        目标.目标游戏内大小序列.Sequence[1] = { 100.0,100.0,10.0 };
+        目标.移动序列.Sequence[1] = { -1000,1000,10,0.5 };
+        目标.移动序列.Sequence[2] = { 2000,2000,10,1.0 };
+        目标.移动序列.Sequence[3] = { -2000,1000,10,1.5 };
+        目标.移动序列.Sequence[4] = { 1000,2000,10,2.0 };
+        目标.移动序列.Sequence[5] = { -1000,1000,10,2.5 };
+        目标.移动序列.Sequence[6] = { 2000,2000,10,3.0 };
+        目标.移动序列.Sequence[7] = { -2000,1000,10,3.5 };
+        目标.移动序列.Sequence[8] = { 1000,2000,10,4.0 };
+        目标.移动序列.Sequence[9] = { -2000,1000,10,4.5 };
+        目标.移动序列.Sequence[10] = { 1000,2000,10,5.0 };
+        目标.移动序列.Sequence[11] = { -2000,1000,10,5.5 };
+        目标.目标游戏内大小序列.Sequence[0] = { 1000.0,1000.0,0 };
+        目标.目标游戏内大小序列.Sequence[1] = { 1000.0,1000.0,10.0 };
+        目标.目标血量 = 200;
     }
     {
         你.压枪方向熟练程度 = 10;
         你.压枪时间熟练程度 = 10;
         你.压枪速度熟练程度 = 10;
-        你.反应力 = 0.1;
+        你.反应力 = 0.2;
         你.简单压枪倍率 = 1;
         你.简单目标跟踪倍率 = 1;
-        你.跟枪方向熟练程度 = 10;
-        你.跟枪速度熟练程度 = 10;
+        你.跟枪方向熟练程度 = 5;
+        你.跟枪速度熟练程度 = 5;
         你.跟枪等级 = 1;
     }  
-    复杂模型累计概率形(枪, 目标, 你, 1000);
-    SequencePoint 后座序列 = 枪.枪械子弹序列;
-    SequencePoint 压枪序列 = SequencePoint(100);
-    SequenceLocation 移动序列 = 目标.移动序列;
-    ScreenPoint 移动屏幕序列 = (0, 0);
-    SequencePoint 跟枪序列 = SequencePoint(500);
-    DecisionBox 目标边框位置 = DecisionBox(0, 0, 0, 0);
-    后座序列.屏幕拐点位置_转速度函数();
-    压枪序列.压枪函数(你, 后座序列);
-    移动序列.实际拐点位置_转速度函数();
-    跟枪序列.跟枪函数(后座序列, 压枪序列, 移动序列, 你);
-    显示函数(后座序列, 压枪序列, 移动序列, 跟枪序列);
+    改进TTK计算(枪, 目标, 你, 1000, 1000);
+ //   {   SequencePoint 后座序列 = 枪.枪械子弹序列;
+ //   SequencePoint 压枪序列 = SequencePoint(100);
+ //   SequenceLocation 移动序列 = 目标.移动序列;
+ //  SequencePoint 跟枪序列 = SequencePoint(500);
+ //   SequenceBox 目标大小序列 = 目标.目标游戏内大小序列;
+//    后座序列.屏幕拐点位置_转速度函数();
+ //   后座序列.序列缩减();
+//    压枪序列.压枪函数(你, 后座序列);
+//    压枪序列.序列缩减();
+ //   移动序列.实际拐点位置_转速度函数();
+ //   移动序列.序列缩减();
+ //   跟枪序列.跟枪函数(后座序列, 压枪序列, 移动序列, 你);
+ //   跟枪序列.序列缩减();
+//    cout << 后座序列 << endl << 压枪序列 << endl << 移动序列 << endl << 跟枪序列;
+ //   显示函数(后座序列, 压枪序列, 移动序列, 跟枪序列, 目标大小序列, 枪.子弹散布参数); }
 }
