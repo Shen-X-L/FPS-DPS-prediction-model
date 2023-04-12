@@ -241,7 +241,7 @@ public:
 
 class SizeOfBox {//目标简单判定框大小    复杂模型可以由多个框组成  这里暂时使用单个方框
 public:
-    SizeOfBox(double InX=10, double InY=10, double InT=0):X(InX), Y(InY), Time(InT){}
+    SizeOfBox(double InX=0, double InY=0, double InT=0):X(InX), Y(InY), Time(InT){}
     double X;
     double Y;
     double Time;
@@ -294,8 +294,6 @@ public:
 };
 
 struct 玩家技术 {//定义在最开始 后面有函数用到这个结构体
-    double 简单压枪倍率;
-    double 简单目标跟踪倍率;
     double 压枪方向熟练程度;
     double 压枪速度熟练程度;
     double 压枪时间熟练程度;
@@ -442,23 +440,25 @@ public:
             Sequence.pop_back();
         }
     };
+    void 序列检查() {
+
+    }
 };
 
 struct 目标总体 {//说实话 一些函数已经完全被序列替代了
-    SequenceBox 目标游戏内大小序列= SequenceBox(10);
+    SequenceBox 目标大小序列= SequenceBox(10);
     SequenceLocation 移动序列= SequenceLocation(100);
     int 目标血量;
-    DecisionBox 目标在屏幕位置;
 };
 
 struct 枪械 {//枪械的一个集合 包含许多基本要素
     int 武器伤害;//伤害常量
-    float 武器射速;//射速
-    float 耗光时间;//弹夹耗光时间
-    float 放大倍率;//放大倍率
-    float 换弹时间;//换弹时间
-    float 持枪移动速度;//持枪时移动速度
-    float 射击移动速度;//射击时移动速度
+    double 武器射速;//射速
+    double 耗光时间;//弹夹耗光时间
+    double 放大倍率;//放大倍率
+    double 换弹时间;//换弹时间
+    double 持枪移动速度;//持枪时移动速度
+    double 射击移动速度;//射击时移动速度
     SequencePoint 枪械子弹序列 = SequencePoint(100);//预设100发子弹的后座位置或者关键拐点位置
     子弹衰减函数类型 子弹衰减函数指针;
     double 子弹散布参数;
@@ -522,13 +522,13 @@ double 均匀分布累计概率密度(double X, double Y ,double 边界) {//子�
 
 double 子弹衰减(double 目标位置Z) {//子弹衰减函数   (瞎设的数值)
     double 衰减倍率;
-    if (目标位置Z <= 50) {//如果与目标距离小于50伤害不变
+    if (目标位置Z <= 5000) {//如果与目标距离小于5000伤害不变
         衰减倍率 = 1;
     }
-    else if (目标位置Z <= 70) {//如果与目标距离大于50 小于70伤害乘0.7
+    else if (目标位置Z <= 7000) {//如果与目标距离大于5000 小于70伤害乘0.7
         衰减倍率 = 0.7;
     }
-    else {//如果与目标距离大于70伤害乘0.5
+    else {//如果与目标距离大于7000伤害乘0.5
         衰减倍率 = 0.5;
     }
     return 衰减倍率;
@@ -549,7 +549,7 @@ DecisionBox 实际位置函数(SequencePoint 后坐力序列, SequencePoint 压�
     return 临时变量;
 };
 
-double 复杂模型累计概率形(枪械 枪械实体, 目标总体 目标实体,玩家技术 玩家实体, int 运算精度,double& 击杀时间,int 目标血量) {//无压枪 目标无位移 
+double 复杂模型累计概率形(枪械 枪械实体, 目标总体 目标实体,玩家技术 玩家实体, int 运算精度,double& 击杀时间,int 目标血量,bool 详细内容开关) {//无压枪 目标无位移 
     double 临时伤害总和变量 = 0;
     double 时间变量 = 0;
     double 命中概率 = 0;
@@ -571,14 +571,15 @@ double 复杂模型累计概率形(枪械 枪械实体, 目标总体 目标实�
     跟枪序列.序列缩减();
     for (i = 0; i < 枪械实体.耗光时间 * 运算精度; i++) {
         时间变量 = (double)i / (double)运算精度;
-        目标边框位置 = 实际位置函数(后座序列, 压枪序列, 移动序列, 跟枪序列, 目标实体.目标游戏内大小序列, 玩家实体, 时间变量);
+        目标边框位置 = 实际位置函数(后座序列, 压枪序列, 移动序列, 跟枪序列, 目标实体.目标大小序列, 玩家实体, 时间变量);
         命中概率 = 目标边框位置.HitRate(枪械实体.子弹概率累计函数指针, 枪械实体.子弹散布参数);
         临时伤害总和变量 = 临时伤害总和变量 + 命中概率 * 枪械实体.武器伤害 * 枪械实体.武器射速 * 枪械实体.子弹衰减函数指针(移动序列.实际拐点型_转实际位置函数(时间变量).Z) / (double)运算精度;
         if (目标血量 < 临时伤害总和变量&& 击杀判定) {
             击杀时间 = (double)i / (double)运算精度;
             击杀判定 = false;
         }
- //      cout<<" 总伤害 " << 临时伤害总和变量<< 目标边框位置<< "时间" << 时间变量<<endl;
+        if(详细内容开关)
+        cout<<" 总伤害 " << 临时伤害总和变量<< 目标边框位置<< "时间" << 时间变量<<endl;
     }
     if (击杀判定)
         cout << "单弹夹未击杀目标" << endl;
@@ -596,11 +597,11 @@ void 改进TTK计算(枪械 枪械实体, 目标总体 目标实体, 玩家技�
     for (int i = 0; i < 运算次数; i++) {
         改进TTK = 0;
         临时血量 = 目标实体.目标血量;
-        单弹夹总输出 = 复杂模型累计概率形(枪械实体, 目标实体, 玩家实体, DPS运算精度,击杀时间, 临时血量);
+        单弹夹总输出 = 复杂模型累计概率形(枪械实体, 目标实体, 玩家实体, DPS运算精度,击杀时间, 临时血量,false);
         for (; 单弹夹总输出 < 临时血量;) {
             改进TTK = 改进TTK + 枪械实体.耗光时间 + 枪械实体.换弹时间;
             临时血量 = 临时血量-单弹夹总输出;
-            单弹夹总输出 = 复杂模型累计概率形(枪械实体, 目标实体, 玩家实体, DPS运算精度,击杀时间, 临时血量);
+            单弹夹总输出 = 复杂模型累计概率形(枪械实体, 目标实体, 玩家实体, DPS运算精度,击杀时间, 临时血量,false);
         }
             改进TTK = 改进TTK+ 击杀时间;
        cout << 改进TTK << endl;
@@ -608,8 +609,6 @@ void 改进TTK计算(枪械 枪械实体, 目标总体 目标实体, 玩家技�
     }
     cout << sum / 运算次数;
 }
-
-
 
 
 void 目标运动绘制函数(SequenceLocation, double, Mat&, ScreenPoint, ScreenPoint, GameLocation, GameLocation);
@@ -688,6 +687,374 @@ void 显示函数(SequencePoint 后坐力拐点, SequencePoint 压枪拐点, Seq
     return;
 };
 
+void 输入函数(枪械& 枪械实体, 目标总体& 目标实体, 玩家技术& 玩家实体) {
+    char 输入;
+    int 临时int变量, 临时运算次数变量;
+    double 临时double变量;
+    int 临时数组变量;
+    double x, y, z, time;
+    double 击杀时间 = 0;
+    for (;;) {//相当于while(true)
+    输入阶段1:;
+        cout << "输入a进行枪械修改 输入b进行目标修改 输入c进行玩家修改 输入d进行运行选择 输入其他退出:";
+        cin >> 输入;
+        cout << endl;
+        switch (输入) {
+        case 'a': {
+            for (;;) {
+            输入阶段2a:
+                cout << "输入a进行武器伤害修改 输入b进行武器射速修改 输入c进行单弹夹耗光时间修改 输入d进行子弹散布参数修改 输入e进行换弹时间修改 " << endl;
+                cout << "输入f进行后座修改 输入g查看数据 输入其他退出(目前子弹衰减放大倍率 放大倍率 持枪移动速度不可在程序内修改):" << endl;
+                cin >> 输入;
+                cout << endl;
+                switch (输入) {
+                case 'a': {
+                    cout << "输入武器伤害数值:";
+                    cin >> 临时int变量;
+                    枪械实体.武器伤害 = 临时int变量;
+                    cout << endl;
+                    cout << "输入完成 值为:" << 枪械实体.武器伤害 << endl;
+                    break;
+                }
+                case'b': {
+                    cout << "输入武器射速数值:";
+                    cin >> 临时double变量;
+                    枪械实体.武器射速 = 临时double变量;
+                    cout << endl;
+                    cout << "输入完成 值为:" << 枪械实体.武器射速 << endl;
+                    break;
+                }
+                case'c': {
+                    cout << "输入单弹夹耗光时间数值 (单弹夹耗光时间=单弹夹子弹数/射速):";
+                    cin >> 临时double变量;
+                    枪械实体.耗光时间 = 临时double变量;
+                    cout << endl;
+                    cout << "输入完成 值为:" << 枪械实体.耗光时间 << endl;
+                    break;
+                }
+                case'd': {
+                    cout << "输入子弹散布参数数值 (参数为最大散布距准星中心像素差距):";
+                    cin >> 临时double变量;
+                    枪械实体.子弹散布参数 = 临时double变量;
+                    cout << endl;
+                    cout << "输入完成 值为:" << 枪械实体.子弹散布参数 << endl;
+                    break;
+                }
+                case'e': {
+                    cout << "输入换弹时间数值:";
+                    cin >> 临时double变量;
+                    枪械实体.换弹时间 = 临时double变量;
+                    cout << endl;
+                    cout << "输入完成 值为:" << 枪械实体.换弹时间 << endl;
+                    break;
+                }
+                case'f': {
+                    for (;;) {
+                        cout << "输入后坐力拐点序列 (化为简单折线 (ps:可以每一个点都输入) 输入转折点距离第一枪x坐标,y坐标,时间):" << endl;
+                        cout << "输入a进行武器后续添加拐点 输入b进行定向拐点修改 输入c进行定向拐点删除 输入d进行检查并缩减 输入其他退出" << endl;
+                        cout << "(推荐使用b进行定向修改,最后用d进行缩减 a添加后续默认从101个点开始 ):" << endl;
+                        cin >> 输入;
+                        switch (输入) {
+                        case'a': {
+                            cout << "输入一次最后点的X, Y,Time:";
+                            cin >> x >> y >> time;
+                            cout << endl;
+                            枪械实体.枪械子弹序列.Sequence.pop_back();
+                            枪械实体.枪械子弹序列.Sequence.push_back(InflectionPoint(x, y, time));
+                            枪械实体.枪械子弹序列.Sequence.push_back(InflectionPoint());
+                            cout << "最后点的x, y,Time为 X:" << x << " Y:" << y << " Time" << time;
+                            break;
+                        }
+                        case'b': {
+                            cout << "输入一次第i点的X, Y,Time:";
+                            cin >> 临时数组变量 >> x >> y >> time;
+                            cout << endl;
+                            if (临时数组变量 < 枪械实体.枪械子弹序列.Sequence.size()) {
+                                枪械实体.枪械子弹序列.Sequence[临时数组变量] = InflectionPoint(x, y, time);
+                                if (临时数组变量 = 枪械实体.枪械子弹序列.Sequence.size() - 1)
+                                    枪械实体.枪械子弹序列.Sequence.push_back(InflectionPoint());
+                            }
+                            else {
+                                cout << "第i点过大 建议使用a进行延长序列 实际长度为" << 枪械实体.枪械子弹序列.Sequence.size() - 1;
+                            }
+                            break;
+                        }
+                        case'c': {
+                            cout << "删除第i点";
+                            cin >> 临时数组变量;
+                            枪械实体.枪械子弹序列.Sequence.erase(begin(枪械实体.枪械子弹序列.Sequence) + 临时数组变量);
+                            break;
+                        }
+                        case'd': {
+                            枪械实体.枪械子弹序列.序列缩减();
+                            for (临时数组变量 = 1; 临时数组变量 < 枪械实体.枪械子弹序列.Sequence.size() - 1; 临时数组变量++) {
+                                if (枪械实体.枪械子弹序列.Sequence[临时数组变量].Time < 枪械实体.枪械子弹序列.Sequence[临时数组变量 - 1].Time) {
+                                    cout << "第" << 临时数组变量 << "点错误";
+                                }
+                            }
+                            cout << 枪械实体.枪械子弹序列;
+                            break;
+                        }
+                        default: {
+                            goto 输入阶段2a;
+                        }
+                        }
+                    }
+                }
+                case'g': {
+                    cout << " 武器伤害:" << 枪械实体.武器伤害 << " 武器射速:" << 枪械实体.武器射速 << " 单弹夹耗光时间:" << 枪械实体.耗光时间 << " 子弹散布参数:" << 枪械实体.子弹散布参数 << " 换弹时间:" << 枪械实体.换弹时间 << endl;
+                    cout << 枪械实体.枪械子弹序列;
+                    break;
+                }
+                default: {
+                    goto 输入阶段1;
+                }
+                }
+            }
+        }
+        case'b': {
+            for (;;) {
+            输入阶段2b:
+                cout << "输入a进行目标血量修改 输入b进行目标移动修改 输入c进行目标大小修改 输入d查看数据 输入其他退出" << endl;
+                cin >> 输入;
+                cout << endl;
+                switch (输入) {
+                case 'a': {
+                    cout << "输入目标血量数值:";
+                    cin >> 临时int变量;
+                    目标实体.目标血量 = 临时int变量;
+                    cout << endl;
+                    cout << "输入完成 值为:" << 目标实体.目标血量 << endl;
+                    break;
+                }
+                case'b': {
+                    for (;;) {
+                        cout << "输入目标移动拐点序列 (化为简单折线 (ps:可以每一个点都输入) 输入移动拐点距离玩家x坐标,y坐标,z坐标,t时间):" << endl;
+                        cout << "输入a进行添加拐点 输入b进行定向拐点修改 输入c进行定向拐点删除 输入d进行检查并缩减 输入其他退出" << endl;
+                        cout << "(推荐使用b进行定向修改,最后用d进行缩减 a添加后续默认从101个点开始 ):" << endl;
+                        cin >> 输入;
+                        switch (输入) {
+                        case'a': {
+                            cout << "一次性输入最后点的X,Y,Z,Time(z点不可为0):";
+                            cin >> x >> y >> z >> time;
+                            cout << endl;
+                            目标实体.移动序列.Sequence.pop_back();
+                            目标实体.移动序列.Sequence.push_back(InflectionLocation(x, y, z, time));
+                            目标实体.移动序列.Sequence.push_back(InflectionLocation());
+                            cout << "最后点的x, y,Time为 X:" << x << " Y:" << y << " Z:" << z << " Time" << time;
+                            break;
+                        }
+                        case'b': {
+                            cout << "输入一次第i点的X, Y,Time:";
+                            cin >> x >> y >> z >> time;
+                            cout << endl;
+                            if (临时数组变量 < 目标实体.移动序列.Sequence.size()) {
+                                目标实体.移动序列.Sequence[临时数组变量] = InflectionLocation(x, y, z, time);
+                                if (临时数组变量 = 目标实体.移动序列.Sequence.size() - 1)
+                                    目标实体.移动序列.Sequence.push_back(InflectionLocation());
+                            }
+                            else {
+                                cout << "第i点过大 建议使用a进行延长序列 实际长度为" << 目标实体.移动序列.Sequence.size() - 1;
+                            }
+                            break;
+                        }
+                        case'c': {
+                            cout << "删除第i点";
+                            cin >> 临时数组变量;
+                            目标实体.移动序列.Sequence.erase(begin(目标实体.移动序列.Sequence) + 临时数组变量);
+                            break;
+                        }
+                        case'd': {
+                            目标实体.移动序列.序列缩减();
+                            for (临时数组变量 = 1; 临时数组变量 < 目标实体.移动序列.Sequence.size() - 1; 临时数组变量++) {
+                                if (目标实体.移动序列.Sequence[临时数组变量].Time < 目标实体.移动序列.Sequence[临时数组变量 - 1].Time) {
+                                    cout << "第" << 临时数组变量 << "点错误";
+                                }
+                            }
+                            cout << 目标实体.移动序列;
+                            break;
+                        }
+                        default: {
+                            goto 输入阶段2b;
+                        }
+                        }
+                    }
+                }
+                case'c': {
+                    for (;;) {
+                        cout << "输入目标大小按时间序列 输入大小在游戏内x坐标,y坐标,t时间):" << endl;
+                        cout << "输入a进行添加变形时间 输入b进行变形时间修改 输入c进行变形时间删除 输入d进行检查并缩减 输入其他退出" << endl;
+                        cout << "(推荐使用b进行定向修改,最后用d进行缩减 a添加后续默认从11个点开始 默认大小为0):" << endl;
+                        cin >> 输入;
+                        switch (输入) {
+                        case'a': {
+                            cout << "输入一次最后点的X,Y,Time(点不可为0):";
+                            cin >> x >> y >> time;
+                            cout << endl;
+                            目标实体.目标大小序列.Sequence.pop_back();
+                            目标实体.目标大小序列.Sequence.push_back(SizeOfBox(x, y, time));
+                            目标实体.目标大小序列.Sequence.push_back(SizeOfBox());
+                            cout << "最后点的x, y,Time为 X:" << x << " Y:" << y << " Time" << time;
+                            break;
+                        }
+                        case'b': {
+                            cout << "输入一次第i点的X, Y,Time:";
+                            cin >> x >> y >> time;
+                            cout << endl;
+                            if (临时数组变量 < 目标实体.目标大小序列.Sequence.size()) {
+                                目标实体.目标大小序列.Sequence[临时数组变量] = SizeOfBox(x, y, time);
+                                if (临时数组变量 = 目标实体.目标大小序列.Sequence.size() - 1)
+                                    目标实体.目标大小序列.Sequence.push_back(SizeOfBox());
+                            }
+                            else {
+                                cout << "第i点过大 建议使用a进行延长序列 实际长度为" << 目标实体.目标大小序列.Sequence.size() - 1;
+                            }
+                            break;
+                        }
+                        case'c': {
+                            cout << "删除第i点";
+                            cin >> 临时数组变量;
+                            目标实体.目标大小序列.Sequence.erase(begin(目标实体.目标大小序列.Sequence) + 临时数组变量);
+                            break;
+                        }
+                        case'd': {
+                            目标实体.目标大小序列.序列缩减();
+                            for (临时数组变量 = 1; 临时数组变量 < 目标实体.目标大小序列.Sequence.size() - 1; 临时数组变量++) {
+                                if (目标实体.目标大小序列.Sequence[临时数组变量].Time < 目标实体.目标大小序列.Sequence[临时数组变量 - 1].Time) {
+                                    cout << "第" << 临时数组变量 << "点错误";
+                                }
+                            }
+                            cout << 目标实体.目标大小序列;
+                            break;
+                        }
+                        default: {
+                            goto 输入阶段2b;
+                        }
+                        }
+                    }
+                }
+                case'd': {
+                    cout << " 目标血量:" << 目标实体.目标血量 << endl;
+                    cout << 目标实体.目标大小序列;
+                    cout << 枪械实体.枪械子弹序列;
+                    break;
+                }
+                default: {
+                    goto 输入阶段1;
+                }
+                }
+            }
+        }
+        case'c': {
+            for (;;) {
+                cout << "输入a进行压枪方向熟练程度修改 输入b进行压枪时间熟练程度修改 输入c进行压枪速度熟练程度修改 输入d进行反应力修改" << endl;
+                cout << "输入e进行跟枪方向熟练程度修改 输入f进行跟枪速度熟练程度修改 输入g查看数值 输入其他退出(目前子弹衰减放大倍率 放大倍率 持枪移动速度不可在程序内修改):" << endl;
+                cin >> 输入;
+                cout << endl;
+                switch (输入) {
+                case 'a': {
+                    cout << "输入压枪方向熟练程度数值:";
+                    cin >> 临时double变量;
+                    玩家实体.压枪方向熟练程度 = 临时double变量;
+                    cout << endl;
+                    cout << "输入完成 值为:" << 玩家实体.压枪方向熟练程度 << endl;
+                    break;
+                }
+                case'b': {
+                    cout << "输入压枪时间熟练程度数值:";
+                    cin >> 临时double变量;
+                    玩家实体.压枪时间熟练程度 = 临时double变量;
+                    cout << endl;
+                    cout << "输入完成 值为:" << 玩家实体.压枪时间熟练程度 << endl;
+                    break;
+                }
+                case'c': {
+                    cout << "输入压枪速度熟练程度数值:";
+                    cin >> 临时double变量;
+                    玩家实体.压枪速度熟练程度 = 临时double变量;
+                    cout << endl;
+                    cout << "输入完成 值为:" << 玩家实体.压枪速度熟练程度 << endl;
+                    break;
+                }
+                case'd': {
+                    cout << "输入反应力:";
+                    cin >> 临时double变量;
+                    玩家实体.反应力 = 临时double变量;
+                    cout << endl;
+                    cout << "输入完成 值为:" << 玩家实体.反应力 << endl;
+                    break;
+                }
+                case'e': {
+                    cout << "输入跟枪方向熟练程度:";
+                    cin >> 临时double变量;
+                    玩家实体.跟枪方向熟练程度 = 临时double变量;
+                    cout << endl;
+                    cout << "输入完成 值为:" << 玩家实体.跟枪方向熟练程度 << endl;
+                    break;
+                }
+                case'f': {
+                    cout << "输入跟枪方向速度熟练程度:";
+                    cin >> 临时double变量;
+                    玩家实体.跟枪速度熟练程度 = 临时double变量;
+                    cout << endl;
+                    cout << "输入完成 值为:" << 玩家实体.跟枪速度熟练程度 << endl;
+                    break;
+                }
+                case'g': {
+                    cout << " 压枪方向熟练程度数值:" << 玩家实体.压枪方向熟练程度 << " 压枪时间熟练程度数值:" << 玩家实体.压枪时间熟练程度 << " 压枪速度熟练程度数值:" << 玩家实体.压枪速度熟练程度 << endl;
+                    cout << " 反应力数值:" << 玩家实体.反应力 << " 跟枪方向熟练程度:" << 玩家实体.跟枪方向熟练程度 << " 跟枪速度熟练程度:" << 玩家实体.跟枪速度熟练程度 << endl;
+                }
+                default: {
+                    goto 输入阶段1;
+                }
+                }
+            }
+        }
+        case'd': {
+            cout << "输入a进行单弹夹输出详细记录 输入b进行单弹夹输出图像过程 输入c进行改进TTK运算 输入其他退出:";
+            cin >> 输入;
+            cout << endl;
+            switch (输入) {
+            case'a': {
+                cout << "输入运算模拟精度(建议100以上)";
+                cin >> 临时int变量;
+                复杂模型累计概率形(枪械实体, 目标实体, 玩家实体, 临时int变量, 击杀时间, 目标实体.目标血量, true);
+                break;
+            }
+            case'b': {
+                SequencePoint 压枪序列 = SequencePoint(100);
+                SequencePoint 跟枪序列 = SequencePoint(500);
+                目标实体.目标大小序列;
+                枪械实体.枪械子弹序列.屏幕拐点位置_转速度函数();
+                枪械实体.枪械子弹序列.序列缩减();
+                压枪序列.压枪函数(玩家实体, 枪械实体.枪械子弹序列);
+                压枪序列.序列缩减();
+                目标实体.移动序列.实际拐点位置_转速度函数();
+                目标实体.移动序列.序列缩减();
+                跟枪序列.跟枪函数(枪械实体.枪械子弹序列, 压枪序列, 目标实体.移动序列, 玩家实体);
+                跟枪序列.序列缩减();
+                显示函数(枪械实体.枪械子弹序列, 压枪序列, 目标实体.移动序列, 跟枪序列, 目标实体.目标大小序列, 枪械实体.子弹散布参数);
+            }
+            case'c': {
+                cout << "输入单次运算模拟精度(建议100以上)";
+                cin >> 临时int变量;
+                cout << "输入运算模拟次数(建议100以上)";
+                cin >> 临时运算次数变量;
+                改进TTK计算(枪械实体, 目标实体, 玩家实体, 临时int变量, 临时运算次数变量);
+            }
+            default: {
+                break;
+            }
+            }
+            break;
+        }
+        default: {
+            return;
+        }
+        }
+    }
+}
+
 void 目标运动绘制函数(SequenceLocation 目标移动, double Time, Mat& frame, ScreenPoint Now, ScreenPoint 中心, GameLocation 目标移动偏差, GameLocation 目标大小) {
     int j;
     for (j = 0; 目标移动.Sequence[j + 1].Time < Time; j++) {
@@ -739,8 +1106,8 @@ int main()
         目标.移动序列.Sequence[9] = { -2000,1000,10,4.5 };
         目标.移动序列.Sequence[10] = { 1000,2000,10,5.0 };
         目标.移动序列.Sequence[11] = { -2000,1000,10,5.5 };
-        目标.目标游戏内大小序列.Sequence[0] = { 1000.0,1000.0,0 };
-        目标.目标游戏内大小序列.Sequence[1] = { 1000.0,1000.0,10.0 };
+        目标.目标大小序列.Sequence[0] = { 1000.0,1000.0,0 };
+        目标.目标大小序列.Sequence[1] = { 1000.0,1000.0,10.0 };
         目标.目标血量 = 200;
     }
     {
@@ -748,13 +1115,12 @@ int main()
         你.压枪时间熟练程度 = 10;
         你.压枪速度熟练程度 = 10;
         你.反应力 = 0.2;
-        你.简单压枪倍率 = 1;
-        你.简单目标跟踪倍率 = 1;
         你.跟枪方向熟练程度 = 5;
         你.跟枪速度熟练程度 = 5;
         你.跟枪等级 = 1;
     }  
-    改进TTK计算(枪, 目标, 你, 1000, 1000);
+    输入函数(枪, 目标, 你);
+ //   改进TTK计算(枪, 目标, 你, 1000, 1000);
  //   {   SequencePoint 后座序列 = 枪.枪械子弹序列;
  //   SequencePoint 压枪序列 = SequencePoint(100);
  //   SequenceLocation 移动序列 = 目标.移动序列;
